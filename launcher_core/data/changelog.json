@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "_comment": "Newest release first. The update dialog previews the entries newer than the running version; the About dialog shows the current one.",
+  "releases": [
+    {
+      "version": "1.3.0",
+      "date": "2026-07-23",
+      "title": "Onboarding & Diagnostics",
+      "highlights": [
+        "A first-run guide that checks your computer before you play",
+        "Downloads now resume where they stopped and retry by themselves",
+        "One-click diagnostic report for when something goes wrong",
+        "Game data moved out of Documents into AppData, automatically"
+      ],
+      "notes": [
+        "Added: first-run setup guide with a live system check (disk, memory, Java, network).",
+        "Added: download speed and time remaining on the progress bar.",
+        "Added: automatic retry with exponential backoff, and resume of interrupted downloads.",
+        "Added: diagnostic report bundle - logs, settings and system details in one redacted file.",
+        "Added: Report Issue button that opens GitHub with the details already filled in.",
+        "Added: keyboard shortcuts - P to play, S for settings, L for the log, Escape to close.",
+        "Added: activity log filtering, search and export.",
+        "Added: player data is backed up before it is reset.",
+        "Changed: game data now lives in AppData instead of Documents; existing installs are moved automatically.",
+        "Changed: Settings is split into Memory, Graphics, Network, Behaviour and Diagnostics.",
+        "Changed: help now includes a searchable FAQ and step-by-step fixes for common problems.",
+        "Changed: the launch progress bar is weighted, so it no longer sits still during the long steps."
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-07-14",
+      "title": "Hogwarts Edition",
+      "highlights": [
+        "Microsoft sign-in with encrypted token storage",
+        "Automatic crash recovery for the world server",
+        "macOS and Linux support"
+      ],
+      "notes": [
+        "Added: Microsoft device-code sign-in; tokens stored in the OS credential store.",
+        "Added: world server crash supervision with automatic restart.",
+        "Added: macOS .app bundle and Linux support.",
+        "Changed: memory is now sized from the machine's RAM instead of a fixed 6 GB.",
+        "Fixed: orphaned Java processes holding ports after a hard crash."
+      ]
+    }
+  ]
+}

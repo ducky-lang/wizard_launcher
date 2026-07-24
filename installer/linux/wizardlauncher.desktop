@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Wizard Launcher
+Comment=Launcher for the Witchcraft and Wizardry Minecraft server
+Exec=AppRun
+Icon=wizardlauncher
+Categories=Game;
+Terminal=false

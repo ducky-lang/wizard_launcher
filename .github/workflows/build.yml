@@ -1,0 +1,110 @@
+name: Build installers
+
+# Builds all three installers in one run - Windows (.exe), macOS (.dmg) and
+# Linux (.AppImage) - because PyInstaller cannot cross-compile: each package
+# can only be produced by tools/build.py running on that actual OS. A local
+# machine only ever gets one of the three; this workflow's whole point is to
+# get real Windows/macOS/Linux runners for the other two.
+#
+# Requires one repo secret: MC_LAUNCHER_CLIENT_ID (the Azure AD application
+# id from the developer .env - see SECURITY_ARCHITECTURE.md; it is a public
+# OAuth client id, not a bearer secret, but it is still kept out of the
+# tracked source the same way tools/build.py always clears it locally).
+# Settings > Secrets and variables > Actions > New repository secret.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - run: python tools/make_icon.py
+      - run: python tools/build.py --client-id "${{ secrets.MC_LAUNCHER_CLIENT_ID }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            build_installer/*.exe
+            build_installer/SHA256SUMS.txt
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python tools/make_icon.py
+      - run: python tools/build.py --client-id "${{ secrets.MC_LAUNCHER_CLIENT_ID }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: |
+            build_installer/*.dmg
+            build_installer/SHA256SUMS.txt
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Install appimagetool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
+          chmod +x /usr/local/bin/appimagetool
+      - run: python tools/make_icon.py
+      - run: python tools/build.py --client-id "${{ secrets.MC_LAUNCHER_CLIENT_ID }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-installer
+          path: |
+            build_installer/*.AppImage
+            build_installer/SHA256SUMS.txt
+          if-no-files-found: error
+
+  # Only on an actual version tag - workflow_dispatch runs build/test the
+  # pipeline without cutting a release.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Merge checksums
+        # Each job's SHA256SUMS.txt only lists the one installer it built;
+        # combine them into one file that covers all three.
+        run: |
+          cat dist/*/SHA256SUMS.txt | sort -k2 > dist/SHA256SUMS.txt
+          find dist -mindepth 2 -name SHA256SUMS.txt -delete
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/windows-installer/*.exe
+            dist/macos-installer/*.dmg
+            dist/linux-installer/*.AppImage
+            dist/SHA256SUMS.txt
+          generate_release_notes: true

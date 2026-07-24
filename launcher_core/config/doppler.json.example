@@ -1,0 +1,12 @@
+{
+  "doppler": {
+    "project": "wizard-launcher",
+    "config": "prd",
+    "enabled": true
+  },
+  "secrets": {
+    "database_password": "DATABASE_PASSWORD",
+    "api_key": "API_KEY",
+    "server_token": "SERVER_TOKEN"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "_comment": "The launcher's visual identity. ui/theme.py reads this and falls back to the same values if the file is missing, so the app can never start up unstyled.",
+
+  "palette": {
+    "bg": "#08080c",
+    "bg_deep": "#050508",
+    "panel_bg": "#111118",
+    "panel_bg_alt": "#141420",
+    "card_border": "#26262f",
+    "gold": "#f2c14e",
+    "gold_bright": "#ffe08a",
+    "gold_dim": "#3a2f13",
+    "gold_wash": "#1a1608",
+    "arcane": "#8b7ae8",
+    "arcane_dim": "#241f3d",
+    "danger": "#ef4444",
+    "danger_wash": "#1a1214",
+    "danger_border": "#3a1f22",
+    "success": "#7de3b0",
+    "warn": "#fbbf24",
+    "text_main": "#f4f4f8",
+    "text_sub": "#a8a8b8",
+    "text_faint": "#6c6c7c"
+  },
+
+  "flame_colors": ["#f2c14e", "#f7d476", "#ff9a3c", "#ff6f3c", "#ffe08a"],
+  "spark_colors": ["#ffe08a", "#f2c14e", "#8b7ae8", "#ffffff", "#7de3b0"],
+
+  "background_gradient": {
+    "_comment": "A slow vertical wash that lifts the flat black off the screen. Stops run top to bottom.",
+    "colors": ["#0b0a14", "#08080c", "#0d0a06"],
+    "stops": [0.0, 0.55, 1.0]
+  },
+
+  "typography": {
+    "display": {
+      "family": "Cinzel",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf"
+    },
+    "display_decorative": {
+      "family": "Cinzel Decorative",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzeldecorative/CinzelDecorative-Bold.ttf"
+    },
+    "body": {
+      "family": "Poppins",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf"
+    },
+    "body_medium": {
+      "family": "Poppins Medium",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Medium.ttf"
+    },
+    "body_semibold": {
+      "family": "Poppins SemiBold",
+      "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-SemiBold.ttf"
+    }
+  },
+
+  "animation": {
+    "particle_count": 34,
+    "spark_count": 26,
+    "frame_interval_focused": 0.055,
+    "frame_interval_background": 0.6,
+    "rune_rotation_seconds": 24
+  },
+
+  "runes": ["ᚱ", "ᚠ", "ᛒ", "ᛞ", "ᛁ", "ᛦ", "ᚨ", "ᛗ"]
+}

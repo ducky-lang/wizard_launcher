@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "_comment": "What the launcher installs and where it gets it. constants.py reads this and keeps the previous hardcoded values as fallbacks, so a missing or malformed catalog degrades to the shipped defaults rather than breaking a launch.",
+
+  "minecraft": {
+    "client_version": "1.20.1",
+    "server_version": "1.16.5",
+    "required_java_major": 17,
+    "server_java_min": 8,
+    "server_java_max": 16
+  },
+
+  "ports": {
+    "server": 25565,
+    "proxy": 25566
+  },
+
+  "server_entry": {
+    "name": "Witchcraft and Wizardry",
+    "host": "127.0.0.1"
+  },
+
+  "download": {
+    "_comment": "Only these registrable domains may serve launcher content; a redirect anywhere else aborts the download before a byte is written. Matched by suffix, so the leading dot in the comparison is what stops evil-huggingface.co from qualifying.",
+    "allowed_domains": ["huggingface.co", "hf.co"],
+    "max_retries": 4,
+    "backoff_seconds": 2.0,
+    "backoff_max_seconds": 30.0
+  },
+
+  "resources": [
+    {
+      "id": "map",
+      "name": "Witchcraft and Wizardry",
+      "kind": "world",
+      "url": "https://huggingface.co/datasets/Foxybeo/wz_launcher/resolve/main/Witchcraft%20and%20Wizardry.zip?download=true",
+      "sha256": "",
+      "approx_mb": 1100,
+      "description": "The castle, its grounds and the whole adventure."
+    },
+    {
+      "id": "resource_pack",
+      "name": "Resource Pack",
+      "kind": "resourcepack",
+      "url": "https://huggingface.co/datasets/Foxybeo/wz_launcher/resolve/main/Resource%20Pack.zip?download=true",
+      "sha256": "",
+      "approx_mb": 350,
+      "description": "Textures, models and sounds the map is built around."
+    }
+  ],
+
+  "provisioning": {
+    "_comment": "Optional. Lets the Azure application id be rotated without shipping a new build. NOT a confidentiality mechanism - a public-client app id is public by design; see launcher_core/provisioning.py. Leave manifest_url empty to switch the whole feature off (the default): the build-time embedded value is then the only source.",
+    "_setup": "python tools/sign_manifest.py --new-key   then   --sign client-id.json. Publish the .json and .json.sig, put the printed public key below.",
+    "manifest_url": "",
+    "signature_url": "",
+    "public_key": "",
+    "allowed_domains": ["huggingface.co", "hf.co", "githubusercontent.com"],
+    "refresh_hours": 24
+  },
+
+  "disk": {
+    "_comment": "Used by the first-run system check. client_mb covers the Minecraft client, the mods and a downloaded Java runtime.",
+    "client_mb": 1400,
+    "headroom_mb": 1000
+  },
+
+  "links": {
+    "issues": "https://github.com/foxy/wizard-launcher/issues",
+    "issue_new": "https://github.com/foxy/wizard-launcher/issues/new",
+    "releases": "https://github.com/foxy/wizard-launcher/releases",
+    "map_credit": "https://www.thefloonetwork.net/",
+    "java_download": "https://adoptium.net"
+  }
+}

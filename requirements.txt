@@ -1,0 +1,20 @@
+# Runtime dependencies for Wizard Launcher.
+#
+# Pinned to what tools/build.py's PyInstaller build was actually tested
+# against, so a fresh checkout (a contributor's machine, or CI) reproduces
+# the same build instead of picking up whatever the resolver finds today.
+#
+# psutil, cryptography and keyring are wrapped in try/except ImportError at
+# their call sites (see launcher_core/config.py, provisioning.py,
+# secure_store.py) so the app degrades gracefully without them - they are
+# listed here anyway because the degraded path (no process tracking, no
+# provisioning signature check, no OS keychain) is not what should ship.
+flet==0.24.1
+requests==2.34.2
+minecraft-launcher-lib==8.0
+psutil==7.2.2
+cryptography==49.0.0
+keyring==25.7.0
+
+# Build-only, not imported by the app itself, but needed to run tools/build.py.
+pyinstaller==6.21.0

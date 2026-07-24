@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "_comment": "All user-facing copy for Wizard Launcher. Edited without touching code; every consumer falls back to a built-in default if a key is missing, so a typo here degrades the text rather than breaking the launcher.",
+
+  "story": {
+    "title": "Witchcraft & Wizardry",
+    "tagline": "A castle, rebuilt block by block.",
+    "paragraphs": [
+      "Witchcraft and Wizardry is a hand-built adventure map: a full castle, its grounds, and a story you walk through rather than read. It was made by The Floo Network over several years, and it is played on a Minecraft 1.16.5 world.",
+      "Your launcher handles the awkward part. It runs the world on your own computer, bridges it to a modern Minecraft 1.20.1 client, installs the mods that make it run smoothly, and connects you - all from one button.",
+      "Nothing you do here touches the official Minecraft launcher, your existing worlds, or your saves."
+    ],
+    "facts": [
+      { "label": "The map", "value": "Witchcraft and Wizardry by The Floo Network" },
+      { "label": "You play on", "value": "Minecraft 1.20.1, bridged to a 1.16.5 world" },
+      { "label": "First launch", "value": "A few minutes - the castle is downloaded once" },
+      { "label": "Every launch after", "value": "About 15 seconds" }
+    ]
+  },
+
+  "onboarding": {
+    "steps": [
+      {
+        "id": "welcome",
+        "icon": "auto_stories_rounded",
+        "title": "Welcome to the castle",
+        "body": "This launcher exists so that stepping into Witchcraft and Wizardry takes one click instead of an afternoon. There is nothing to configure - the next few screens just check that your computer is ready.",
+        "kind": "story"
+      },
+      {
+        "id": "system",
+        "icon": "monitor_heart_rounded",
+        "title": "Checking your computer",
+        "body": "A quick look at disk space, memory and Java. Anything the launcher can fix by itself, it will.",
+        "kind": "system_check"
+      },
+      {
+        "id": "account",
+        "icon": "person_rounded",
+        "title": "How you want to play",
+        "body": "Sign in with Microsoft to use your real Minecraft name and skin, or just pick a name and play. You can change this at any time from the top right of the launcher.",
+        "kind": "account"
+      },
+      {
+        "id": "memory",
+        "icon": "memory_rounded",
+        "title": "Performance",
+        "body": "The launcher has measured your RAM and picked memory settings that fit. You can change them later in Settings if the game feels slow.",
+        "kind": "memory"
+      },
+      {
+        "id": "ready",
+        "icon": "auto_fix_high_rounded",
+        "title": "You're ready",
+        "body": "Press Begin the Journey when you are. The first launch downloads the castle and the game files, so it takes a few minutes - after that it is about fifteen seconds.",
+        "kind": "ready"
+      }
+    ]
+  },
+
+  "account_modes": [
+    {
+      "id": "signin",
+      "icon": "verified_rounded",
+      "title": "Sign in with Microsoft",
+      "summary": "Your real name and skin",
+      "points": [
+        "Other players see your actual Minecraft username and skin",
+        "Sign-in happens on Microsoft's own page - this launcher never sees your password",
+        "Your session is encrypted and stored in Windows Credential Manager"
+      ],
+      "requires": "A Minecraft account you own"
+    },
+    {
+      "id": "guest",
+      "icon": "person_outline_rounded",
+      "title": "Play as a guest",
+      "summary": "Pick any name, start now",
+      "points": [
+        "No sign-in, nothing stored, ready immediately",
+        "You choose the name that appears in game",
+        "The default Steve or Alex skin is used"
+      ],
+      "requires": "Nothing"
+    }
+  ],
+
+  "getting_started": [
+    {
+      "title": "Sign in (optional)",
+      "body": "Click 'Guest Wizard' at the top right to use your real Minecraft name and skin. You can also just type a name and play."
+    },
+    {
+      "title": "Press Begin the Journey",
+      "body": "The first launch downloads the castle and the game files - expect a few minutes on the first run and about 15 seconds after that."
+    },
+    {
+      "title": "Wait for Minecraft to open",
+      "body": "The launcher starts the world server, opens the portal, then launches the game and connects you automatically."
+    },
+    {
+      "title": "When you're done",
+      "body": "Just close Minecraft. The launcher shuts the world down and saves it for you."
+    }
+  ],
+
+  "faq": [
+    {
+      "question": "Do I need to own Minecraft?",
+      "answer": "Yes. Wizard Launcher does not include Minecraft and never downloads a copy of the game you have not paid for. It downloads the map and the mods, and uses your own account to run the game.",
+      "tags": ["account", "legal"]
+    },
+    {
+      "question": "Does this affect my normal Minecraft?",
+      "answer": "No. The launcher keeps its own game folder, its own mods and its own worlds. Your existing worlds, servers and settings are untouched.",
+      "tags": ["safety"]
+    },
+    {
+      "question": "Can my friends join me?",
+      "answer": "Turn on 'Allow friends on my network to join' in Settings, then give them your computer's local IP address. Only people on the same Wi-Fi or LAN can connect - the launcher never opens your world to the internet.",
+      "tags": ["multiplayer", "network"]
+    },
+    {
+      "question": "Where are my files kept?",
+      "answer": "In your AppData folder. Open Settings and use 'Open game folder' to go straight there. Earlier versions kept them in Documents; if you are upgrading, the launcher moved them for you and left a note behind.",
+      "tags": ["files"]
+    },
+    {
+      "question": "How much disk space do I need?",
+      "answer": "About 4 GB free: roughly 1.5 GB for the castle and resource pack, and the rest for the Minecraft client, the mods and a Java runtime.",
+      "tags": ["disk"]
+    },
+    {
+      "question": "Is my Microsoft password safe?",
+      "answer": "The launcher never sees it. Sign-in happens on Microsoft's own website and only a token comes back, which is encrypted before it is stored. Log files are scrubbed of tokens before anything is written to disk.",
+      "tags": ["security", "account"]
+    },
+    {
+      "question": "Why does it need Java?",
+      "answer": "Minecraft and the world server both run on Java. The launcher finds a suitable version on your computer, and downloads an official one from Mojang if there is not one.",
+      "tags": ["java"]
+    },
+    {
+      "question": "Can I keep playing if I close the launcher?",
+      "answer": "Yes. Close the launcher any time after Minecraft has opened - a small helper keeps watching, and shuts the world down and saves it when you quit the game.",
+      "tags": ["play"]
+    }
+  ],
+
+  "troubleshooting": [
+    {
+      "id": "port_in_use",
+      "symptom": "It says a port is already in use",
+      "cause": "Something else is holding port 25565 or 25566 - usually a world server from a previous session that did not shut down.",
+      "steps": [
+        "Press Stop in the launcher; that releases both ports.",
+        "If it persists, close any other Minecraft server running on this PC.",
+        "As a last resort, restart your computer."
+      ]
+    },
+    {
+      "id": "not_connected",
+      "symptom": "Minecraft opened but did not connect",
+      "cause": "The client started before the portal finished opening, or you closed the connection screen.",
+      "steps": [
+        "Open the Multiplayer menu - 'Witchcraft and Wizardry' is already in the server list.",
+        "Click it to join.",
+        "If it shows as offline, go back to the launcher and press Stop, then Play again."
+      ]
+    },
+    {
+      "id": "stutter",
+      "symptom": "The game stutters or freezes every few seconds",
+      "cause": "The world server and the game are competing for memory on the same machine.",
+      "steps": [
+        "Open Settings and lower the world server memory by 512 MB.",
+        "Turn off background animations in Settings to free up a CPU core.",
+        "Close other heavy programs - browsers with many tabs are the usual culprit.",
+        "Lower the render distance inside Minecraft's own video settings."
+      ]
+    },
+    {
+      "id": "no_java",
+      "symptom": "It cannot find Java, or the download fails",
+      "cause": "No suitable Java runtime is installed and the automatic download was blocked.",
+      "steps": [
+        "Check your internet connection and firewall, then press Play again.",
+        "Or install Java 17 from https://adoptium.net and restart the launcher.",
+        "Antivirus software sometimes blocks the download - allow Wizard Launcher through it."
+      ]
+    },
+    {
+      "id": "download_fails",
+      "symptom": "The castle download keeps failing",
+      "cause": "An unstable connection, or something between you and the download server interfering with HTTPS.",
+      "steps": [
+        "Press Play again - a partial download is resumed rather than restarted.",
+        "Try a different network, such as a phone hotspot.",
+        "Temporarily disable 'HTTPS scanning' in your antivirus.",
+        "If it still fails, use Clear Cache and let it download fresh."
+      ]
+    },
+    {
+      "id": "start_over",
+      "symptom": "I want to start completely over",
+      "cause": "",
+      "steps": [
+        "'Clear Cache' erases the world, your progress and the downloaded game files - everything is downloaded again on the next launch.",
+        "'Clear Player Data' only resets your inventory, position and advancements, keeping everything that was built.",
+        "Player data is backed up automatically before it is reset, so a mistake is recoverable."
+      ]
+    },
+    {
+      "id": "crashed",
+      "symptom": "Something crashed",
+      "cause": "",
+      "steps": [
+        "Use 'Create diagnostic report' below - it collects the logs and your system details into one file.",
+        "Attach that file to a GitHub issue with the Report Issue button.",
+        "Passwords and tokens are removed from everything the launcher writes."
+      ]
+    }
+  ],
+
+  "idle_messages": [
+    "Spells are humming in the halls...",
+    "The runes are settling into silence...",
+    "Embers drift, waiting for a word...",
+    "The old tome lies open, unread...",
+    "A quiet wind stirs the enchanted halls...",
+    "The cauldron simmers, patient and low...",
+    "Stars align above the wizard's tower...",
+    "Dust motes dance in the candlelight...",
+    "Portraits whisper behind their frames...",
+    "The staircase has moved again..."
+  ],
+
+  "incantations": [
+    "Aperio castellum",
+    "Lumos maxima",
+    "Portus aperire",
+    "Revelio mundi",
+    "Alohomora"
+  ],
+
+  "launch_steps": [
+    { "key": "java", "label": "Finding Java", "weight": 1 },
+    { "key": "resources", "label": "Checking game files", "weight": 2 },
+    { "key": "world", "label": "Preparing the castle", "weight": 3 },
+    { "key": "client_files", "label": "Preparing the client", "weight": 3 },
+    { "key": "server", "label": "Starting the server", "weight": 2 },
+    { "key": "proxy", "label": "Opening the portal", "weight": 1 },
+    { "key": "client", "label": "Launching Minecraft", "weight": 1 }
+  ]
+}
