@@ -13,7 +13,7 @@ manifest never sees a failed request.
 Manifest format (JSON, served over HTTPS)::
 
     {
-      "version": "1.2.0",
+      "version": "1.0.0",
       "url": "https://github.com/<you>/wizard-launcher/releases/latest",
       "notes": "What changed in this release",
       "mandatory": false
