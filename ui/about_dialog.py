@@ -21,40 +21,12 @@ from launcher_core.version import (
     ABOUT_TEXT, APP_NAME, CREDITS, LEGAL_NOTICE, VERSION, VERSION_STRING,
 )
 
-from . import theme
+from . import brand, theme
 
-
-def wand_mark(size=52, icon_size=24):
-    """The launcher's own mark: a wand striking a spark.
-
-    Built from primitives rather than shipped as an image so it scales
-    cleanly, tints with the palette, and adds nothing to the download.
-    """
-    return ft.Container(
-        content=ft.Stack(
-            [
-                ft.Container(
-                    content=ft.Icon(ft.icons.AUTO_FIX_HIGH_ROUNDED, color=theme.GOLD,
-                                    size=icon_size),
-                    alignment=ft.alignment.center, width=size, height=size,
-                ),
-                ft.Container(
-                    content=ft.Icon(ft.icons.AUTO_AWESOME_ROUNDED, color=theme.GOLD_BRIGHT,
-                                    size=icon_size * 0.42),
-                    left=size * 0.60, top=size * 0.14, opacity=0.95,
-                ),
-                ft.Container(
-                    content=ft.Icon(ft.icons.AUTO_AWESOME_ROUNDED, color=theme.ARCANE,
-                                    size=icon_size * 0.28),
-                    left=size * 0.14, top=size * 0.60, opacity=0.75,
-                ),
-            ],
-            width=size, height=size,
-        ),
-        width=size, height=size, border_radius=size * 0.27,
-        bgcolor=theme.GOLD_WASH, border=ft.border.all(0.8, theme.GOLD_DIM),
-        alignment=ft.alignment.center,
-    )
+# The mark lives in ui.brand now, so the logo can be swapped by replacing an
+# asset rather than by editing a drawing. Re-exported because this is where
+# the rest of the UI has always imported it from.
+wand_mark = brand.logo_mark
 
 
 def _changelog_block(release, dense=False):

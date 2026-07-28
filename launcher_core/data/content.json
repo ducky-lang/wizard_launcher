@@ -7,14 +7,15 @@
     "tagline": "A castle, rebuilt block by block.",
     "paragraphs": [
       "Witchcraft and Wizardry is a hand-built adventure map: a full castle, its grounds, and a story you walk through rather than read. It was made by The Floo Network over several years, and it is played on a Minecraft 1.16.5 world.",
-      "Your launcher handles the awkward part. It runs the world on your own computer, bridges it to a modern Minecraft 1.20.1 client, installs the mods that make it run smoothly, and connects you - all from one button.",
+      "Your launcher handles the awkward part. It runs the world on your own computer, bridges it to a modern Minecraft 1.20.1 client, installs the Fabulously Optimized modpack so the game runs smoothly, and connects you - all from one button.",
       "Nothing you do here touches the official Minecraft launcher, your existing worlds, or your saves."
     ],
     "facts": [
       { "label": "The map", "value": "Witchcraft and Wizardry by The Floo Network" },
       { "label": "You play on", "value": "Minecraft 1.20.1, bridged to a 1.16.5 world" },
-      { "label": "First launch", "value": "A few minutes - the castle is downloaded once" },
-      { "label": "Every launch after", "value": "About 15 seconds" }
+      { "label": "Mods", "value": "Fabulously Optimized, installed from Modrinth" },
+      { "label": "First launch", "value": "A few minutes - the castle and the mods are downloaded once" },
+      { "label": "Every launch after", "value": "About 15 seconds - nothing is re-checked" }
     ]
   },
 
@@ -205,9 +206,9 @@
       "symptom": "I want to start completely over",
       "cause": "",
       "steps": [
-        "'Clear Cache' erases the world, your progress and the downloaded game files - everything is downloaded again on the next launch.",
-        "'Clear Player Data' only resets your inventory, position and advancements, keeping everything that was built.",
-        "Player data is backed up automatically before it is reset, so a mistake is recoverable."
+        "'Clear Player Data' deletes the world and installs the castle again from scratch - your progress and everything you built go with it, but the downloaded files are kept, so it takes seconds.",
+        "'Clear Cache' goes further: it also removes the downloaded castle, resource pack and mods, so the next launch downloads everything again.",
+        "Your progress is backed up automatically before either one runs, so a mistake is recoverable from the backups folder."
       ]
     },
     {

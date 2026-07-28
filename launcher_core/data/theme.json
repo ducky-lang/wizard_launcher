@@ -61,7 +61,7 @@
     "spark_count": 26,
     "frame_interval_focused": 0.055,
     "frame_interval_background": 0.6,
-    "rune_rotation_seconds": 24
+    "rune_drift_count": 12
   },
 
   "runes": ["ᚱ", "ᚠ", "ᛒ", "ᛞ", "ᛁ", "ᛦ", "ᚨ", "ᛗ"]

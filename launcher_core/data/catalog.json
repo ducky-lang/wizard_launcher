@@ -28,6 +28,27 @@
     "backoff_max_seconds": 30.0
   },
 
+  "modpack": {
+    "_comment": "The client mod set, installed from Modrinth on first run instead of being bundled with the installer. Pinning the exact version and its SHA-512 is what makes the install reproducible: the launcher never asks an API 'what is latest', so a compromised or simply changed upstream cannot alter what a given build installs. Bump version+url+sha512 together to move the pack forward.",
+    "_source": "https://modrinth.com/modpack/fabulously-optimized",
+    "id": "fabulously-optimized",
+    "name": "Fabulously Optimized",
+    "version": "5.4.1",
+    "url": "https://cdn.modrinth.com/data/1KVo5zza/versions/2ZbcYfCj/Fabulously.Optimized-5.4.1.mrpack",
+    "sha512": "af4b2043f00bcceefdbe1c0ec3ea3cc4d385052d963a9778164b702c3a5dad6e60aa30a1d293ab03b5b780fe1fce75dc846ee3d40a7d1c01bddf74dd76174e62",
+    "approx_mb": 120,
+    "allowed_domains": ["modrinth.com"],
+    "extra_mods": [
+      {
+        "_comment": "The world server runs offline-mode, so it never sends a skin texture and every player renders as the default Steve however they signed in. CustomSkinLoader fixes that entirely on the client by looking the skin up from Mojang by username, which keeps the server itself vanilla.",
+        "name": "CustomSkinLoader",
+        "path": "mods/CustomSkinLoader_Universal-15.0.1.jar",
+        "url": "https://cdn.modrinth.com/data/idMHQ4n2/versions/OLaesh5y/CustomSkinLoader_Universal-15.0.1.jar",
+        "sha512": "8c65193c46c1435ddea571901f1dd04cc179179f59f1c1a0449349de04722b9c1b6e5efaec166975e05d2fa0b05f6c07c9d5d93a05f1c9a57fece2a0d0fc1ce7"
+      }
+    ]
+  },
+
   "resources": [
     {
       "id": "map",
@@ -57,6 +78,18 @@
     "public_key": "",
     "allowed_domains": ["huggingface.co", "hf.co", "githubusercontent.com"],
     "refresh_hours": 24
+  },
+
+  "server_properties": {
+    "_comment": "Forced into server.properties on every launch (launcher_core/server_manager.py). The first block is security - server-ip is the one that decides whether the neighbours can join. The second block is what makes a local world behave like a singleplayer one: every command a singleplayer world with cheats allows, plus flight, which vanilla otherwise kicks you for.",
+    "allow-flight": "true",
+    "enable-command-block": "true",
+    "op-permission-level": "4",
+    "function-permission-level": "2",
+    "spawn-protection": "0",
+    "_broadcast_comment": "The player is an operator now, and op broadcast turns every command block firing in the castle into chat spam.",
+    "broadcast-console-to-ops": "false",
+    "broadcast-rcon-to-ops": "false"
   },
 
   "disk": {

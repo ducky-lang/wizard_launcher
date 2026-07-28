@@ -196,8 +196,9 @@ class SettingsDialog:
             theme.setting_row("Restart the server if it crashes",
                               "Brings the world back without closing the game.",
                               self.switches["auto_restart_server"]),
-            theme.setting_row("Hide the launcher after Play",
-                              "Minimises the window once Minecraft opens.",
+            theme.setting_row("Close the launcher after Play",
+                              "Closes the window once Minecraft opens. The world still "
+                              "saves and shuts down when you quit the game.",
                               self.switches["close_launcher_on_play"]),
             theme.divider(),
             theme.section_label("Safety"),

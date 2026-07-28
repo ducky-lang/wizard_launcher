@@ -1,28 +1,55 @@
-"""The moving parts of the background.
+"""The moving parts of the window.
 
-Three layers, drawn back to front:
+The layers, drawn back to front:
 
 ``Starfield``
     Static. Seeded from a fixed value so the sky is the same every launch -
     a background that rearranges itself on every start reads as a glitch.
 
-``EmberField``
-    The drifting flame particles. This is the only thing here that costs
-    CPU, so it is also the only thing with an idle discipline: when the
-    window is unfocused, minimised, or animations are switched off, it all
-    but stops. The window still redraws on demand; it just stops burning a
-    core to animate pixels nobody is looking at.
+``title_halo``
+    A still, warm bloom behind the wordmark. Replaces the old rotating rune
+    ring, which drew the eye to an empty circle in the middle of the window
+    and competed with the thing it was supposed to frame. A halo does the
+    same job - stop the title floating on flat black - without moving.
 
+``RuneDrift``
+    Sparse glyphs rising slowly through the background. What is left of the
+    rune ring's character, spread across the whole window instead of
+    orbiting a hole in the middle of it, and an order of magnitude cheaper
+    than the particle field because it moves at four frames a second.
+
+``EmberField``
+    The drifting flame particles. The most expensive thing here, so it is
+    the one with an idle discipline: when the window is unfocused,
+    minimised, or animations are switched off, it all but stops. The window
+    still redraws on demand; it just stops burning a core to animate pixels
+    nobody is looking at.
+
+And the foreground details, which is where animation actually earns its
+keep - on the control the player is about to use rather than behind it:
+
+``Sheen``
+    A light sweep across the Play button every few seconds, so the primary
+    action reads as the live thing on the screen.
+``BreathingGlow``
+    The Play button's shadow swelling and settling. Two property writes per
+    cycle; Flutter interpolates the rest.
+``Pulse``
+    The status dot, breathing in whatever colour the current state set.
 ``SpellBurst``
     A one-shot flourish fired when the player presses Play. Sparks fly
     outward from the button and fade. It runs for well under a second and
     then removes itself, so it never competes with the launch it is
     celebrating.
 
-Everything runs on a daemon thread and mutates control properties directly,
-then calls ``update()`` on the one Stack that owns them. That is much
-cheaper than rebuilding controls per frame, and it is why the whole
+Everything animated runs on a daemon thread and mutates control properties
+directly, then calls ``update()`` on the one control that owns them. That is
+much cheaper than rebuilding controls per frame, and it is why the whole
 background costs a single update call per frame rather than one per particle.
+
+Every loop here checks ``settings["animations"]`` and goes quiet when it is
+off. The one-shot flourishes additionally honour ``spell_effects``, because
+somebody on a laptop may want the ambient motion without the fireworks.
 """
 
 import math
@@ -53,74 +80,272 @@ class Starfield:
         self.control = ft.Stack(stars, width=width, height=height)
 
 
-class RuneRing:
-    """A slowly turning circle of runes, floating behind the title.
+def title_halo(size=560):
+    """The still bloom behind the wordmark.
 
-    Belongs in a *background* layer rather than in the content column: it is
-    decoration, and a decoration that reserves its own height in the layout
-    punches a hole in whatever it was meant to sit behind.
+    A radial gradient rather than an animation on purpose. This sits directly
+    behind the largest text on the screen, and anything that moves there
+    fights the thing it is meant to support - which is exactly what the
+    rotating rune ring it replaces did.
 
-    Deliberately cheap. Flutter interpolates the rotation, so keeping it
-    turning costs one property write and one update every
-    :data:`theme.RUNE_ROTATION_SECONDS` - roughly two updates a minute,
-    against the ember field's eighteen a second.
+    Layout-neutral: it lives in the root Stack, so it costs the column
+    nothing. The ring, being in the content column, reserved 430px of
+    vertical space for a decoration and opened a hole between the wordmark
+    and the subtitle.
+    """
+    return ft.Container(
+        width=size, height=size, border_radius=size / 2,
+        gradient=ft.RadialGradient(
+            colors=[theme.GOLD_WASH, theme.BG_DEEP + "00", "#00000000"],
+            stops=[0.0, 0.62, 1.0],
+            radius=0.62,
+        ),
+        opacity=0.75,
+    )
+
+
+class RuneDrift:
+    """Sparse glyphs rising slowly through the background.
+
+    Keeps the rune motif the ring carried without parking it in a circle in
+    the middle of the screen. Twelve glyphs at four frames a second is a
+    rounding error next to the ember field, which is why this can run
+    alongside it rather than instead of it.
     """
 
-    def __init__(self, size=420, glyph_count=8):
-        glyphs = []
-        runes = theme.RUNES or ["*"]
-        radius = size / 2 - 18
-        for index in range(glyph_count):
-            angle = (2 * math.pi / glyph_count) * index
-            glyphs.append(ft.Container(
-                content=ft.Text(runes[index % len(runes)], size=15,
-                                color=theme.GOLD, font_family=theme.FONT_DISPLAY),
-                left=size / 2 + radius * math.cos(angle) - 10,
-                top=size / 2 + radius * math.sin(angle) - 10,
-                width=20, height=20, alignment=ft.alignment.center,
-                opacity=0.16, rotate=ft.Rotate(angle + math.pi / 2),
-            ))
+    FRAME = 0.25
 
-        ring = ft.Container(
-            width=size, height=size, border_radius=size / 2,
-            border=ft.border.all(0.8, theme.GOLD_DIM), opacity=0.35,
-        )
-        self.control = ft.Container(
-            content=ft.Stack([ring] + glyphs, width=size, height=size),
-            width=size, height=size,
-            rotate=ft.Rotate(0),
-            animate_rotation=ft.Animation(
-                int(theme.RUNE_ROTATION_SECONDS * 1000), ft.AnimationCurve.LINEAR),
-        )
-        self._angle = 0.0
+    def __init__(self, width, height, settings, count=None, seed=11):
+        count = count or theme.RUNE_DRIFT_COUNT
+        self.width = width or 1400
+        self.height = height or 880
+        self.settings = settings
         self._running = False
 
-    def start(self, schedule_ui, keep_running, settings=None):
-        """Keep the ring turning.
+        rng = random.Random(seed)
+        runes = theme.RUNES or ["*"]
+        self.glyphs = []
+        controls = []
+        for index in range(count):
+            size = rng.uniform(13, 26)
+            control = ft.Container(
+                content=ft.Text(runes[index % len(runes)], size=size,
+                                color=theme.GOLD, font_family=theme.FONT_DISPLAY),
+                left=rng.uniform(0, self.width), top=rng.uniform(0, self.height),
+                width=size * 1.6, height=size * 1.6,
+                alignment=ft.alignment.center,
+                opacity=rng.uniform(0.05, 0.14),
+                rotate=ft.Rotate(rng.uniform(-0.4, 0.4)),
+            )
+            controls.append(control)
+            self.glyphs.append({
+                "c": control,
+                "x": control.left, "y": control.top,
+                "speed": rng.uniform(1.6, 4.2),
+                "sway": rng.uniform(-0.5, 0.5),
+                "peak": rng.uniform(0.05, 0.14),
+            })
+        self.control = ft.Stack(controls, expand=True)
 
-        A half-turn is scheduled every ``RUNE_ROTATION_SECONDS``, which is
-        exactly the animation duration - so each new target is set as the
-        previous one lands and the motion reads as continuous rather than as
-        a series of sweeps.
-        """
+    def start(self):
+        if self._running:
+            return
+        self._running = True
+        threading.Thread(target=self._loop, daemon=True, name="rune-drift").start()
+
+    def stop(self):
+        self._running = False
+
+    def resize(self, width, height):
+        if width:
+            self.width = width
+        if height:
+            self.height = height
+
+    def _loop(self):
+        while self._running:
+            if not self.settings.get("animations"):
+                time.sleep(1.0)
+                continue
+            time.sleep(self.FRAME)
+            try:
+                self._step()
+                self.control.update()
+            except Exception:
+                # A dropped frame is not worth a traceback, and the control
+                # may legitimately be gone if the window is closing.
+                pass
+
+    def _step(self):
+        for glyph in self.glyphs:
+            glyph["y"] -= glyph["speed"]
+            glyph["x"] += glyph["sway"]
+            control = glyph["c"]
+            control.top = glyph["y"]
+            control.left = glyph["x"]
+            # Fade in from the bottom and out at the top, so a glyph never
+            # pops into or out of existence at the window edge.
+            travel = max(0.0, min(1.0, glyph["y"] / max(1.0, self.height)))
+            control.opacity = round(glyph["peak"] * math.sin(travel * math.pi), 3)
+
+            if glyph["y"] < -40:
+                glyph["y"] = self.height + random.uniform(0, 120)
+                glyph["x"] = random.uniform(0, self.width)
+                glyph["speed"] = random.uniform(1.6, 4.2)
+                glyph["sway"] = random.uniform(-0.5, 0.5)
+
+
+class BreathingGlow:
+    """A control's shadow swelling and settling, forever.
+
+    Two property writes per cycle - Flutter interpolates between them - so a
+    three-second breath costs about forty updates an hour, not forty a
+    second. Used on the Play button so the primary action reads as alive
+    while the launcher sits idle.
+    """
+
+    def __init__(self, control, color, low=18, high=46, period=2.6):
+        self.control = control
+        self.color = color
+        self.low = low
+        self.high = high
+        self.period = period
+        self._up = True
+        self._running = False
+        control.animate = ft.Animation(int(period * 1000), ft.AnimationCurve.EASE_IN_OUT)
+
+    def start(self, schedule_ui, keep_running, settings=None):
         if self._running:
             return
         self._running = True
 
         def _loop():
             while keep_running():
-                time.sleep(theme.RUNE_ROTATION_SECONDS)
+                time.sleep(self.period)
                 if settings is not None and not settings.get("animations"):
                     continue
-                schedule_ui(self._turn)
+                schedule_ui(self._breathe)
             self._running = False
 
-        threading.Thread(target=_loop, daemon=True, name="rune-ring").start()
+        threading.Thread(target=_loop, daemon=True, name="glow").start()
 
-    def _turn(self):
-        self._angle += math.pi
-        self.control.rotate = ft.Rotate(self._angle)
+    def _breathe(self):
+        blur = self.high if self._up else self.low
+        self._up = not self._up
         try:
+            self.control.shadow = ft.BoxShadow(
+                blur_radius=blur, spread_radius=1, color=self.color)
+            self.control.update()
+        except Exception:
+            pass
+
+
+class Sheen:
+    """A band of light sweeping across a control.
+
+    Lives inside the control's own Stack and relies on the parent clipping
+    it, so the band appears out of one edge and disappears into the other
+    rather than floating over the window. One offset write starts a sweep;
+    the animation carries it the rest of the way.
+    """
+
+    def __init__(self, width, height, period=5.0, duration=0.9):
+        self.period = period
+        self.duration = duration
+        self._running = False
+        self.control = ft.Container(
+            width=width * 0.35, height=height * 2,
+            rotate=ft.Rotate(0.35),
+            gradient=ft.LinearGradient(
+                begin=ft.alignment.top_left, end=ft.alignment.bottom_right,
+                colors=["#00ffffff", "#38ffffff", "#00ffffff"],
+                stops=[0.0, 0.5, 1.0],
+            ),
+            offset=ft.Offset(-3.2, 0),
+            animate_offset=ft.Animation(int(duration * 1000),
+                                        ft.AnimationCurve.EASE_IN_OUT),
+            opacity=0,
+            animate_opacity=ft.Animation(200, ft.AnimationCurve.LINEAR),
+        )
+
+    def start(self, schedule_ui, keep_running, settings=None):
+        if self._running:
+            return
+        self._running = True
+
+        def _loop():
+            while keep_running():
+                time.sleep(self.period)
+                if settings is not None and not settings.get("animations"):
+                    continue
+                schedule_ui(self._sweep)
+                time.sleep(self.duration + 0.1)
+                schedule_ui(self._reset)
+            self._running = False
+
+        threading.Thread(target=_loop, daemon=True, name="sheen").start()
+
+    def _sweep(self):
+        try:
+            self.control.opacity = 1
+            self.control.offset = ft.Offset(3.2, 0)
+            self.control.update()
+        except Exception:
+            pass
+
+    def _reset(self):
+        """Snap back with the animation disabled, so the return is invisible."""
+        try:
+            self.control.opacity = 0
+            self.control.animate_offset = None
+            self.control.offset = ft.Offset(-3.2, 0)
+            self.control.update()
+            self.control.animate_offset = ft.Animation(
+                int(self.duration * 1000), ft.AnimationCurve.EASE_IN_OUT)
+        except Exception:
+            pass
+
+
+class Pulse:
+    """A control quietly breathing in scale and opacity.
+
+    Used on the status dot, where a still dot next to changing text reads as
+    a stuck indicator rather than a live one.
+    """
+
+    def __init__(self, control, period=1.5, small=0.72, large=1.0):
+        self.control = control
+        self.period = period
+        self.small = small
+        self.large = large
+        self._big = True
+        self._running = False
+        control.animate_scale = ft.Animation(int(period * 1000),
+                                             ft.AnimationCurve.EASE_IN_OUT)
+        control.animate_opacity = ft.Animation(int(period * 1000),
+                                               ft.AnimationCurve.EASE_IN_OUT)
+
+    def start(self, schedule_ui, keep_running, settings=None):
+        if self._running:
+            return
+        self._running = True
+
+        def _loop():
+            while keep_running():
+                time.sleep(self.period)
+                if settings is not None and not settings.get("animations"):
+                    continue
+                schedule_ui(self._beat)
+            self._running = False
+
+        threading.Thread(target=_loop, daemon=True, name="pulse").start()
+
+    def _beat(self):
+        scale = self.small if self._big else self.large
+        self._big = not self._big
+        try:
+            self.control.scale = ft.Scale(scale)
+            self.control.opacity = 0.55 if scale == self.small else 1.0
             self.control.update()
         except Exception:
             pass

@@ -194,6 +194,68 @@ def show_message_box(message, title="Wizard Launcher"):
 # ---------------------------------------------------------------------------
 # Machine identity (used only by the portable crypto fallback)
 # ---------------------------------------------------------------------------
+def set_window_icon(window_title, ico_path, attempts=40, interval=0.25):
+    """Give the launcher window our own icon instead of Flet's.
+
+    Only meaningful on Windows, and only when running unpackaged. A build
+    made by ``tools/build.py`` gets its icon from the executable itself
+    (PyInstaller ``--icon``), which Windows uses for the window and the
+    taskbar automatically. From a source checkout there is no such
+    executable - the host process is Flet's own ``flet.exe``, so the window
+    wears Flet's icon. This replaces it at runtime.
+
+    Flet 0.24 does expose ``page.window.icon``, but it routes the value
+    through the asset resolver before handing it to ``window_manager``, so an
+    absolute path outside the assets folder does not survive. Talking to
+    Win32 directly avoids guessing at that.
+
+    The window does not exist yet when the app starts, so this polls for it.
+    Returns True once the icon is set, False if the window never appeared -
+    never raises, because a wrong icon is not worth failing a launch over.
+    """
+    if not IS_WINDOWS or not ico_path or not os.path.isfile(ico_path):
+        return False
+
+    try:
+        import ctypes
+        import time
+        from ctypes import wintypes
+    except Exception:
+        return False
+
+    WM_SETICON = 0x0080
+    ICON_SMALL, ICON_BIG = 0, 1
+    IMAGE_ICON = 1
+    LR_LOADFROMFILE, LR_DEFAULTSIZE = 0x0010, 0x0040
+
+    try:
+        user32 = ctypes.windll.user32
+        user32.FindWindowW.restype = wintypes.HWND
+        user32.LoadImageW.restype = wintypes.HANDLE
+        user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT,
+                                        wintypes.WPARAM, wintypes.LPARAM]
+
+        for _ in range(max(1, attempts)):
+            hwnd = user32.FindWindowW(None, window_title)
+            if hwnd:
+                break
+            time.sleep(interval)
+        else:
+            return False
+
+        # Small (title bar) and big (taskbar, Alt-Tab) are separate slots and
+        # are loaded separately so each gets the size it wants out of the .ico
+        # rather than a scaled copy of the other.
+        for size, which in ((16, ICON_SMALL), (32, ICON_BIG)):
+            handle = user32.LoadImageW(None, ico_path, IMAGE_ICON, size, size,
+                                       LR_LOADFROMFILE | LR_DEFAULTSIZE)
+            if handle:
+                user32.SendMessageW(hwnd, WM_SETICON, which, handle)
+        return True
+    except Exception:
+        return False
+
+
 def machine_identifiers():
     """Stable per-machine strings, best effort, never fatal.
 

@@ -43,10 +43,11 @@ from launcher_core.constants import (
     SERVER_KEEP_ON_CLEAR, SERVER_PORT, SERVER_VERSION_DIR,
 )
 from launcher_core.exceptions import LauncherError
+from launcher_core.install_state import InstallState
 from launcher_core.java_manager import JavaManager
 from launcher_core.microsoft_auth import MicrosoftAuth
 from launcher_core.paths import get_data_root
-from launcher_core.platform_utils import IS_MACOS, open_path
+from launcher_core.platform_utils import IS_MACOS, open_path, set_window_icon
 from launcher_core.process_manager import ProcessManager
 from launcher_core.proxy_manager import ProxyManager
 from launcher_core.server_manager import ServerManager
@@ -55,7 +56,7 @@ from launcher_core.version import (
     APP_AUTHOR, APP_AUTHOR_HANDLE, APP_NAME, MAP_CREDIT, VERSION_STRING,
 )
 
-from . import about_dialog, account_dialog, effects, help_dialog, onboarding
+from . import about_dialog, account_dialog, brand, effects, help_dialog, onboarding
 from . import settings_dialog, theme
 
 # Launcher lifecycle states.
@@ -127,6 +128,9 @@ class LauncherApp:
 
         self.logger = get_logger()
         self.settings = Settings(log=self.logger.write)
+        # What provisioning has already been done, so reopening the launcher
+        # does not redo a launch's worth of work to arrive at the same state.
+        self.install_state = InstallState(log=self.logger.write)
 
         self.server_dir = os.path.join(self.resources_dir, "servers", SERVER_VERSION_DIR)
         self.map_source_dir = os.path.join(self.resources_dir, "copy", MAP_NAME)
@@ -136,7 +140,9 @@ class LauncherApp:
         self.proxy_dir = os.path.join(self.resources_dir, "proxy")
         self.client_root_dir = os.path.join(self.resources_dir, "client", MC_VERSION)
         self.mc_dir = os.path.join(self.client_root_dir, "minecraft")
-        self.mods_dir = os.path.join(self.client_root_dir, "mods")
+        # The downloaded .mrpack lives here rather than in the game folder, so
+        # a modpack upgrade can reuse it and "Clear Cache" can drop it.
+        self.modpack_cache_dir = os.path.join(self.client_root_dir, "modpack")
 
         # ---- launch progress model -------------------------------------
         # Weighted rather than equal slices: "Preparing the castle" is a
@@ -179,11 +185,13 @@ class LauncherApp:
             self.log, self.map_source_dir, self.world_dest_dir,
             self.resourcepack_source, self.mc_dir, self.server_dir,
             settings=self.settings, progress_fn=self._progress_from_worker,
+            state=self.install_state,
         )
         self.proxy_manager = ProxyManager(self.log, self.proxy_dir, settings=self.settings)
         self.client_manager = ClientManager(
-            self.log, self.logger.write_raw, self.mc_dir, self.mods_dir,
+            self.log, self.logger.write_raw, self.mc_dir, self.modpack_cache_dir,
             settings=self.settings, progress_fn=self._progress_from_worker,
+            state=self.install_state,
         )
         self.ms_auth = MicrosoftAuth(log=self.log, schedule_callback=self.schedule_ui)
 
@@ -192,6 +200,24 @@ class LauncherApp:
         page.on_keyboard_event = self._on_keyboard
 
         threading.Thread(target=self._startup_tasks, daemon=True, name="startup").start()
+        # The window does not exist yet, so this polls for it on its own
+        # thread rather than blocking the first paint.
+        threading.Thread(target=self._apply_window_icon, daemon=True,
+                         name="window-icon").start()
+
+    def _apply_window_icon(self):
+        """Replace Flet's icon on the window and in the taskbar.
+
+        Only does anything from a source checkout on Windows: a packaged
+        build takes its icon from the executable, which the installer script
+        already points at the same artwork.
+        """
+        try:
+            icon = brand.icon_path()
+            if icon:
+                set_window_icon(APP_NAME, icon)
+        except Exception as e:
+            self.logger.write(f"Could not set the window icon: {e}", level="WARN")
 
     # ==================================================================
     # Startup
@@ -254,24 +280,26 @@ class LauncherApp:
         page = self.page
 
         self.starfield = effects.Starfield()
-        # The rune ring is a *background* layer, not part of the centre
-        # column. Putting it in the column meant a 430px box reserving 430px
-        # of vertical space for a decoration, which opened a hole between the
-        # wordmark and the subtitle. In the root Stack it is layout-neutral:
-        # it floats behind the title and costs the layout nothing.
-        self.rune_ring = effects.RuneRing(size=540)
+        # Background layers, not part of the centre column. A decoration that
+        # reserves its own height in the layout punches a hole in whatever it
+        # was meant to sit behind - which is what the old rune ring did, with
+        # a 430px box between the wordmark and the subtitle. In the root Stack
+        # these are layout-neutral.
         self.embers = effects.EmberField(
             page.window.width, page.window.height, self.settings,
             is_minimised=lambda: bool(getattr(page.window, "minimized", False)),
         )
+        self.rune_drift = effects.RuneDrift(
+            page.window.width, page.window.height, self.settings)
         self.spell_burst = effects.SpellBurst(self.schedule_ui)
 
         root_stack = ft.Stack(
             [
                 effects.background_layer(),
                 self.starfield.control,
-                ft.Container(content=self.rune_ring.control,
+                ft.Container(content=effects.title_halo(),
                              alignment=ft.alignment.center, expand=True),
+                self.rune_drift.control,
                 self.embers.control,
                 ft.Column(
                     [
@@ -290,17 +318,20 @@ class LauncherApp:
         page.update()
 
         self.embers.start()
-        self.rune_ring.start(self.schedule_ui, lambda: self._loops_running,
-                             self.settings)
+        self.rune_drift.start()
+        keep_running = lambda: self._loops_running  # noqa: E731
+        self.play_glow.start(self.schedule_ui, keep_running, self.settings)
+        self.play_sheen.start(self.schedule_ui, keep_running, self.settings)
+        self.status_pulse.start(self.schedule_ui, keep_running, self.settings)
         threading.Thread(target=self._idle_status_loop, daemon=True, name="idle-status").start()
         threading.Thread(target=self._idle_timeout_watchdog, daemon=True,
                          name="idle-timeout").start()
 
     # ------------------------------------------------------------------
     def _build_top_bar(self):
-        brand = ft.Row(
+        wordmark = ft.Row(
             [
-                about_dialog.wand_mark(size=36, icon_size=19),
+                brand.logo_mark(size=36, icon_size=19),
                 ft.Text("W&W ", size=19, weight=ft.FontWeight.W_600, color=theme.TEXT_MAIN,
                         font_family=theme.FONT_DISPLAY),
                 ft.Text("LAUNCHER", size=14, color=theme.TEXT_SUB,
@@ -389,7 +420,7 @@ class LauncherApp:
         # lights, which are drawn over the content when the title bar is hidden.
         return ft.Container(
             content=ft.Row(
-                [ft.WindowDragArea(content=brand, maximizable=True, expand=True), buttons_row],
+                [ft.WindowDragArea(content=wordmark, maximizable=True, expand=True), buttons_row],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
             padding=ft.padding.only(
@@ -398,16 +429,6 @@ class LauncherApp:
         )
 
     def _build_center(self):
-        badge = ft.Container(
-            content=ft.Text(f"{MAP_CREDIT} • {APP_AUTHOR}", size=12,
-                            weight=ft.FontWeight.W_600, color=theme.GOLD,
-                            font_family=theme.FONT_BODY_SEMIBOLD,
-                            style=ft.TextStyle(letter_spacing=3)),
-            padding=ft.padding.symmetric(horizontal=18, vertical=8),
-            border_radius=20, border=ft.border.all(1, theme.GOLD_DIM),
-            bgcolor=theme.GOLD_WASH,
-        )
-
         title = ft.Column(
             [
                 ft.Text("WITCHCRAFT", size=52, weight=ft.FontWeight.W_600,
@@ -420,6 +441,18 @@ class LauncherApp:
                         text_align=ft.TextAlign.CENTER),
             ],
             spacing=4, horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
+        # A hairline under the wordmark, brightest in the middle and fading to
+        # nothing at both ends. Cheap, still, and it gives the title a base to
+        # sit on now that the rune ring is not framing it.
+        title_rule = ft.Container(
+            width=340, height=1,
+            gradient=ft.LinearGradient(
+                begin=ft.alignment.center_left, end=ft.alignment.center_right,
+                colors=["#00f2c14e", theme.GOLD, "#00f2c14e"],
+            ),
+            opacity=0.5,
         )
 
         subtitle = ft.Text(
@@ -443,14 +476,43 @@ class LauncherApp:
         self.play_label = ft.Text("Begin the Journey", size=17, weight=ft.FontWeight.W_600,
                                   color="#161616", font_family=theme.FONT_BODY_SEMIBOLD,
                                   style=ft.TextStyle(letter_spacing=0.5))
-        self.play_btn = ft.Container(
+        # Two containers, and the split is not cosmetic.
+        #
+        # Flet's Container has one shape it cannot build: `ink=True` together
+        # with `animate`. In that combination it emits an AnimatedContainer
+        # carrying the clip but *not* the decoration (see container.dart in
+        # flet 0.24), and Flutter requires a decoration wherever it is asked
+        # to clip. In a release build that assertion is compiled out and the
+        # widget throws instead, which paints a grey ErrorWidget over
+        # everything below it - the button, the progress bar and the status
+        # line all vanished behind one.
+        #
+        # So the ripple lives on the inner surface, and everything animated -
+        # the breathing shadow, the hover lift, the clip the sheen needs -
+        # lives on the outer shell, which has no ink.
+        self.play_surface = ft.Container(
             content=ft.Row([self.play_icon, self.play_label], spacing=10,
                            alignment=ft.MainAxisAlignment.CENTER),
-            width=340, height=58, border_radius=16, bgcolor=theme.GOLD,
+            width=340, height=58, border_radius=16,
             alignment=ft.alignment.center, ink=True, on_click=self.start_launch,
-            shadow=ft.BoxShadow(blur_radius=30, spread_radius=1, color="#66f2c14e"),
             tooltip="Begin the Journey  (P)",
         )
+        # The sheen is a sibling of the label, not an overlay on top of it:
+        # the shell clips its children, so the band of light enters and leaves
+        # through the button's rounded edges.
+        self.play_sheen = effects.Sheen(width=340, height=58)
+        self.play_btn = ft.Container(
+            content=ft.Stack([self.play_surface, self.play_sheen.control],
+                             width=340, height=58),
+            width=340, height=58, border_radius=16, bgcolor=theme.GOLD,
+            alignment=ft.alignment.center,
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+            shadow=ft.BoxShadow(blur_radius=30, spread_radius=1, color="#66f2c14e"),
+            scale=ft.Scale(1.0),
+            animate_scale=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
+            on_hover=self._play_hover,
+        )
+        self.play_glow = effects.BreathingGlow(self.play_btn, "#66f2c14e")
 
         # ---- progress ---------------------------------------------------
         self.progress_bar = ft.ProgressBar(
@@ -482,6 +544,9 @@ class LauncherApp:
                                    text_align=ft.TextAlign.CENTER)
         self.status_dot = ft.Container(width=6, height=6, border_radius=3,
                                        bgcolor=theme.SUCCESS)
+        # A still dot beside changing text reads as a stuck indicator; a
+        # breathing one reads as a live launcher waiting for you.
+        self.status_pulse = effects.Pulse(self.status_dot)
         self.status_text_wrap = ft.Container(
             content=self.status_text, clip_behavior=ft.ClipBehavior.HARD_EDGE,
             offset=ft.Offset(0, 0), animate_offset=None,
@@ -492,9 +557,9 @@ class LauncherApp:
         return ft.Container(
             content=ft.Column(
                 [
-                    badge,
-                    ft.Container(height=18),
                     title,
+                    ft.Container(height=14),
+                    title_rule,
                     ft.Container(height=18),
                     subtitle,
                     ft.Container(height=26),
@@ -511,15 +576,32 @@ class LauncherApp:
             alignment=ft.alignment.center, expand=True,
         )
 
+    def _play_hover(self, e):
+        """Lift the Play button under the cursor.
+
+        Skipped while the button is disabled: a control that reacts to hover
+        but not to a click is worse than one that does neither.
+        """
+        if self.play_btn.disabled:
+            return
+        hovering = e.data == "true"
+        self.play_btn.scale = ft.Scale(1.03 if hovering else 1.0)
+        self._safe_update(self.play_btn)
+
     def _build_bottom_bar(self):
         self.stop_btn = theme.action_button("Stop", ft.icons.STOP_CIRCLE_ROUNDED,
-                                            self.confirm_stop)
-        self.clear_cache_btn = theme.action_button("Clear Cache",
-                                                   ft.icons.DELETE_SWEEP_ROUNDED,
-                                                   self.confirm_clear_cache)
-        self.clear_player_data_btn = theme.action_button("Clear Player Data",
-                                                         ft.icons.PERSON_REMOVE_ROUNDED,
-                                                         self.confirm_clear_player_data)
+                                            self.confirm_stop,
+                                            tooltip="Stop the game and save the world")
+        self.clear_cache_btn = theme.action_button(
+            "Clear Cache", ft.icons.DELETE_SWEEP_ROUNDED, self.confirm_clear_cache,
+            tooltip="Erase everything, including the downloaded castle and mods")
+        # The label is the one players know; the tooltip is where the scope
+        # gets stated, because this deletes the world now rather than only the
+        # player's progress inside it.
+        self.clear_player_data_btn = theme.action_button(
+            "Clear Player Data", ft.icons.PERSON_REMOVE_ROUNDED,
+            self.confirm_clear_player_data,
+            tooltip="Delete the world and reinstall the castle from scratch")
         theme.set_enabled(self.stop_btn, False)
 
         credit = ft.Text(
@@ -666,6 +748,7 @@ class LauncherApp:
         elif e.data in ("maximize", "unmaximize", "resize", "resized", "restore"):
             self._sync_maximize_icon()
             self.embers.resize(self.page.window.width, self.page.window.height)
+            self.rune_drift.resize(self.page.window.width, self.page.window.height)
         elif e.data == "blur":
             self.embers.set_focused(False)
         elif e.data == "focus":
@@ -870,8 +953,13 @@ class LauncherApp:
         self.play_label.value = label
         self.play_icon.name = icon
         self.play_btn.bgcolor = color
+        # Set on the shell, not the ink surface: Flet propagates `disabled`
+        # down the tree, so this reaches the click target as well.
         self.play_btn.disabled = not enabled
         self.play_btn.opacity = 1.0 if enabled else 0.75
+        if not enabled:
+            # Otherwise a button disabled mid-hover keeps the lift forever.
+            self.play_btn.scale = ft.Scale(1.0)
         self._safe_update(self.play_btn)
 
         # Stop is available exactly when there is something to stop.
@@ -954,7 +1042,7 @@ class LauncherApp:
                     [
                         ft.Icon(ft.icons.ERROR_OUTLINE_ROUNDED, color=theme.DANGER, size=18),
                         ft.Text(f"Failed at: {step_label}", size=12.5, color=theme.DANGER,
-                                font_family=theme.FONT_BODY_SEMIBOLD),
+                                font_family=theme.FONT_BODY_SEMIBOLD, expand=True),
                     ],
                     spacing=8,
                 ),
@@ -1362,7 +1450,11 @@ class LauncherApp:
 
             step_label, fix_id = "starting the world server", "port_in_use"
             self._begin_step("server")
-            self.server_manager.start_server(server_java_path, self.process_manager)
+            # The name is handed down so the server can op this player: an
+            # offline-mode server derives their UUID from it, and ops.json is
+            # keyed by UUID.
+            self.server_manager.start_server(
+                server_java_path, self.process_manager, username=username)
 
             step_label, fix_id = "preparing the client", "download_fails"
             fabric_version_id = client_prep.result()
@@ -1417,7 +1509,7 @@ class LauncherApp:
             self.schedule_ui(self.set_status, "Adventure in progress...", theme.SUCCESS)
 
             if self.settings.get("close_launcher_on_play"):
-                self.schedule_ui(self._minimize_window)
+                self._close_after_launch(session)
 
         except LauncherError as e:
             # A launch that was deliberately stopped mid-flight raises too.
@@ -1445,6 +1537,32 @@ class LauncherApp:
                 "file to a bug report.",
                 tb, "crashed",
             )
+
+    def _close_after_launch(self, session):
+        """Shut the launcher down now that the game is up.
+
+        This used to minimise instead of close, which is not what the setting
+        says and left a window in the taskbar for the whole session.
+
+        Closing here is safe precisely because of the detached watchdog
+        spawned a few lines above: it outlives the launcher and shuts the
+        server and proxy down when Minecraft exits.
+        :meth:`ProcessManager.cleanup` sees the client still running and hands
+        over to it rather than tearing the session down.
+
+        :meth:`_do_close` rather than :meth:`on_close`, because the latter
+        asks "Minecraft is still running, close anyway?" - which is the whole
+        point of this setting, so asking would be absurd.
+
+        The short pause lets the player read "Ready in 12s" before the window
+        goes, and gives Stop a window to cancel: a session that was stopped in
+        the meantime must not close the launcher out from under the user.
+        """
+        time.sleep(1.5)
+        if not self._session_valid(session):
+            return
+        self.log("Closing the launcher - the world will save when you quit Minecraft.")
+        self.schedule_ui(self._do_close)
 
     def _rollback_partial_launch(self, session):
         """A failed launch must not leave a half-started session behind.
@@ -1617,6 +1735,13 @@ class LauncherApp:
             copy_dir = os.path.join(self.resources_dir, "copy")
             if os.path.isdir(copy_dir):
                 shutil.rmtree(copy_dir, ignore_errors=True)
+            if os.path.isdir(self.modpack_cache_dir):
+                shutil.rmtree(self.modpack_cache_dir, ignore_errors=True)
+
+            # Last, so a failure above cannot leave the launcher believing
+            # work is done that has just been deleted. Forgetting everything
+            # is always safe: each step re-verifies from the filesystem.
+            self.install_state.clear()
 
             self.log("Cache cleared.")
             self.schedule_ui(self.show_message, "All clear",
@@ -1635,18 +1760,20 @@ class LauncherApp:
             return
         backing_up = bool(self.settings.get("backup_before_reset"))
         self.show_message(
-            "Reset your progress?",
-            "This deletes only your personal progress:\n"
-            "• Inventory, position and health\n"
-            "• Statistics and advancements\n\n"
-            "The castle and everything built in it is kept.\n\n"
-            + ("A backup is saved first, so this can be undone by copying it back "
+            "Start the castle over?",
+            "This deletes the whole world and installs the castle again from scratch:\n"
+            "• Inventory, position, health and advancements\n"
+            "• Every block you have placed or broken\n"
+            "• Chests, redstone and anything else the world remembers\n\n"
+            "The castle comes back exactly as it ships. Your downloaded files are "
+            "kept, so this takes seconds rather than another download.\n\n"
+            + ("A backup of your progress is saved first, so it can be copied back "
                "from the backups folder."
                if backing_up else
                "Backups are switched off in Settings, so this cannot be undone."),
             on_confirm=lambda: threading.Thread(target=self._clear_player_data_thread,
                                                 daemon=True, name="clear-player").start(),
-            confirm_label="Reset progress", danger=not backing_up,
+            confirm_label="Reinstall the castle", danger=True,
         )
 
     def _backup_player_data(self):
@@ -1695,25 +1822,45 @@ class LauncherApp:
         return path
 
     def _clear_player_data_thread(self):
+        """Delete the world outright and lay the castle back down.
+
+        This used to remove only ``playerdata``/``stats``/``advancements``,
+        which reset the player but left every block they had changed. That is
+        not what "start over" means to somebody who has been building in the
+        castle for a week - they got their inventory wiped and their mess
+        kept. Now the world folder goes and the map is reinstalled from the
+        downloaded copy, so the castle is genuinely as it shipped.
+
+        The archive is not re-downloaded: it is already on disk, so this is a
+        local copy measured in seconds.
+        """
         self._apply_state_threadsafe(STATE_BUSY)
         self.schedule_ui(self._show_progress, True)
-        self.schedule_ui(self._apply_sub_progress, None, "Resetting progress...")
+        self.schedule_ui(self._apply_sub_progress, None, "Starting the castle over...")
         backup_path = ""
         try:
             if self.settings.get("backup_before_reset"):
                 self.schedule_ui(self._apply_sub_progress, None, "Backing up your progress...")
                 backup_path = self._backup_player_data()
 
-            self.log("Clearing player data...")
+            self.log("Removing the world...")
+            self.schedule_ui(self._apply_sub_progress, None, "Removing the old world...")
             if os.path.isdir(self.world_dest_dir):
-                for item in PLAYER_DATA_WORLD_ITEMS:
-                    path = os.path.join(self.world_dest_dir, item)
-                    if os.path.isdir(path):
-                        shutil.rmtree(path, ignore_errors=True)
-                        self.log(f"Removed world/{item}")
+                shutil.rmtree(self.world_dest_dir, ignore_errors=True)
+                if os.path.isdir(self.world_dest_dir):
+                    raise LauncherError(
+                        "The world folder could not be deleted.\n\n"
+                        "How to fix:\n"
+                        "1. Make sure Minecraft and the world server are closed,\n"
+                        "2. Press Stop if either is still running, then try again."
+                    )
+                self.log("World removed.")
             else:
-                self.log("No world installed yet; nothing to reset.")
+                self.log("No world installed yet; installing a fresh one.")
 
+            # ops.json and usercache.json are rewritten on the next launch;
+            # dropping them here keeps a renamed player from inheriting the
+            # previous one's entries.
             for filename in PLAYER_DATA_SERVER_FILES:
                 path = os.path.join(self.server_dir, filename)
                 if os.path.isfile(path):
@@ -1722,18 +1869,23 @@ class LauncherApp:
                     except Exception as err:
                         self.log(f"Could not delete {filename}: {err}", level="WARN")
 
-            self.server_manager.setup_resourcepack()
+            self.schedule_ui(self._apply_sub_progress, None, "Installing the castle...")
+            self.server_manager.copy_map(force=True)
             self.server_manager.setup_server_list()
 
-            self.log("Player data cleared.")
-            message = "Your progress was reset. The castle is untouched."
+            self.log("The castle has been reinstalled.")
+            message = ("The world was deleted and the castle reinstalled from scratch. "
+                       "Your next launch starts at the very beginning.")
             if backup_path:
-                message += f"\n\nA backup was saved to:\n{backup_path}"
-            self.schedule_ui(self.show_message, "Progress reset", message)
+                message += f"\n\nA backup of your old progress was saved to:\n{backup_path}"
+            self.schedule_ui(self.show_message, "Castle reinstalled", message)
+        except LauncherError as e:
+            self.log(f"ERROR while reinstalling the castle: {e}", level="ERROR")
+            self.schedule_ui(self.show_error, "reinstalling the castle", e, "")
         except Exception as e:
             tb = traceback.format_exc()
             self.logger.write_crash(tb)
-            self.schedule_ui(self.show_error, "resetting progress", e, tb)
+            self.schedule_ui(self.show_error, "reinstalling the castle", e, tb)
         finally:
             self._apply_state_threadsafe(STATE_IDLE)
 
@@ -1764,6 +1916,7 @@ class LauncherApp:
         self._closing = True
         self._loops_running = False
         self.embers.stop()
+        self.rune_drift.stop()
         try:
             self.server_manager.stop_supervisor()
             self.process_manager.cleanup()

@@ -139,7 +139,9 @@ PARTICLE_COUNT = _anim("particle_count", 34)
 SPARK_COUNT = _anim("spark_count", 26)
 FRAME_INTERVAL_FOCUSED = _anim("frame_interval_focused", 0.055)
 FRAME_INTERVAL_BACKGROUND = _anim("frame_interval_background", 0.6)
-RUNE_ROTATION_SECONDS = _anim("rune_rotation_seconds", 24)
+# The drifting runes that replaced the rotating ring. Twelve glyphs at four
+# frames a second, against the ember field's thirty-four at eighteen.
+RUNE_DRIFT_COUNT = _anim("rune_drift_count", 12)
 
 
 def background_gradient():
@@ -194,8 +196,15 @@ def body(text, size=13, color=None, **kwargs):
                    font_family=FONT_BODY, **kwargs)
 
 
-def hint(text, size=11.5):
-    return ft.Text(text, size=size, color=TEXT_FAINT, font_family=FONT_BODY)
+def hint(text, size=11.5, **kwargs):
+    """Small muted text.
+
+    Takes ``**kwargs`` so callers can pass ``expand=True``. That is not a
+    nicety: a Text inside a Row has no width of its own, so without it the
+    Row lays the label out at its full single-line width and the end is cut
+    off rather than wrapped. Any hint that shares a Row with an icon needs it.
+    """
+    return ft.Text(text, size=size, color=TEXT_FAINT, font_family=FONT_BODY, **kwargs)
 
 
 def icon_button(icon, tooltip=None, on_click=None, color=None):
@@ -209,7 +218,7 @@ def icon_button(icon, tooltip=None, on_click=None, color=None):
 
 
 def action_button(text, icon, on_click, color=DANGER,
-                  border=None, bg=None):
+                  border=None, bg=None, tooltip=None):
     """A bordered, tinted text button. Returns the container with its icon and
     label stashed in ``.data`` so :func:`set_enabled` can recolour them."""
     icon_ctrl = ft.Icon(icon, size=15, color=color)
@@ -222,7 +231,7 @@ def action_button(text, icon, on_click, color=DANGER,
         border_radius=10,
         border=ft.border.all(0.6, border or DANGER_BORDER),
         bgcolor=bg or DANGER_WASH,
-        ink=True, on_click=on_click,
+        ink=True, on_click=on_click, tooltip=tooltip,
     )
     btn.data = {"icon": icon_ctrl, "text": text_ctrl, "color": color}
     return btn

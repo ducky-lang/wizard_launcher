@@ -1,20 +1,39 @@
+import hashlib
+import json
 import os
 import shutil
 import subprocess
 import threading
 import time
+import uuid
 
 from .constants import (
     SERVER_PORT, PORT_WAIT_MAX_TRIES, SERVER_MAX_RESTARTS,
     SERVER_ENTRY_IP, SERVER_ENTRY_NAME,
     MAP_NAME, RESOURCE_PACK_NAME, MAP_DOWNLOAD_URL, RESOURCE_PACK_DOWNLOAD_URL,
+    SERVER_OP_LEVEL, SERVER_PROPERTIES,
     server_jvm_args,
 )
 from .exceptions import LauncherError
+from .install_state import fingerprint
 from .nbt_utils import read_servers_dat, write_servers_dat
 from .platform_utils import no_window_kwargs
 from .port_utils import check_port_free, is_port_open, process_alive
 from .resource_downloader import ensure_resource
+
+
+def offline_uuid(username):
+    """The UUID a server in offline mode will give this player.
+
+    Vanilla derives it as ``UUID.nameUUIDFromBytes("OfflinePlayer:" + name)``,
+    which is a version-3 (MD5) UUID. Reproducing it here is what lets the
+    launcher write an ops.json entry that the server will actually match:
+    ops are keyed by UUID, so a made-up one silently grants nothing.
+    """
+    digest = bytearray(hashlib.md5(f"OfflinePlayer:{username}".encode("utf-8")).digest())
+    digest[6] = (digest[6] & 0x0F) | 0x30   # version 3
+    digest[8] = (digest[8] & 0x3F) | 0x80   # RFC 4122 variant
+    return str(uuid.UUID(bytes=bytes(digest)))
 
 
 class ServerManager:
@@ -22,7 +41,7 @@ class ServerManager:
 
     def __init__(self, log_fn, map_source_dir, world_dest_dir,
                  resourcepack_source, mc_dir, server_dir, settings=None,
-                 progress_fn=None):
+                 progress_fn=None, state=None):
         self.log = log_fn
         self.map_source_dir = map_source_dir
         self.world_dest_dir = world_dest_dir
@@ -31,6 +50,7 @@ class ServerManager:
         self.server_dir = server_dir
         self.settings = settings
         self.progress = progress_fn or (lambda fraction, message=None: None)
+        self.state = state
 
         self._restart_count = 0
         self._supervisor_stop = threading.Event()
@@ -44,8 +64,15 @@ class ServerManager:
     # ------------------------------------------------------------------
     # Content preparation
     # ------------------------------------------------------------------
-    def copy_map(self):
-        if os.path.exists(self.world_dest_dir) and os.listdir(self.world_dest_dir):
+    def copy_map(self, force=False):
+        """Install the world, downloading it first if it is not cached.
+
+        ``force`` is used by "Clear Player Data", which deliberately deletes
+        the world before calling this so the castle comes back exactly as it
+        ships. The cached archive is reused, so a reinstall is a local copy
+        rather than another gigabyte over the wire.
+        """
+        if not force and os.path.exists(self.world_dest_dir) and os.listdir(self.world_dest_dir):
             self.log("World already installed.")
             return
         ensure_resource(MAP_NAME, MAP_DOWNLOAD_URL, self.map_source_dir, self.log, self.progress)
@@ -56,17 +83,41 @@ class ServerManager:
                 "1. Check your internet connection and press Play again, or\n"
                 "2. Use \"Clear Cache\" and let the launcher download the map fresh."
             )
-        self.log("Installing the castle for the first time...")
+        self.log("Installing the castle..." if force
+                 else "Installing the castle for the first time...")
+        self.progress(None, "Installing the castle...")
         # Copy into a staging folder first: a half-copied world directory
         # would look "already installed" on the next run and boot broken.
         staging = self.world_dest_dir + "_installing"
         if os.path.isdir(staging):
             shutil.rmtree(staging, ignore_errors=True)
         shutil.copytree(self.map_source_dir, staging)
+        if os.path.isdir(self.world_dest_dir):
+            shutil.rmtree(self.world_dest_dir, ignore_errors=True)
         os.replace(staging, self.world_dest_dir)
         self.log("Castle installed.")
 
+    # ------------------------------------------------------------------
+    def _resourcepack_fingerprint(self):
+        return fingerprint(RESOURCE_PACK_NAME, RESOURCE_PACK_DOWNLOAD_URL, self.mc_dir)
+
     def setup_resourcepack(self):
+        """Put the resource pack in the game folder and switch it on.
+
+        Gated on :mod:`launcher_core.install_state`, because the copy is
+        several hundred megabytes and it produced an identical result on
+        every launch after the first. The state check is paired with an
+        existence check on the installed pack, so deleting it by hand still
+        brings it back.
+        """
+        pack_name = os.path.basename(self.resourcepack_source)
+        installed = os.path.join(self.mc_dir, "resourcepacks", pack_name)
+        wanted = self._resourcepack_fingerprint()
+        if (self.state and self.state.matches("resourcepack", wanted)
+                and os.path.exists(installed)):
+            self.log("Resource pack already installed.")
+            return
+
         ensure_resource(
             RESOURCE_PACK_NAME, RESOURCE_PACK_DOWNLOAD_URL,
             self.resourcepack_source, self.log, self.progress,
@@ -79,8 +130,8 @@ class ServerManager:
         dst_dir = os.path.join(self.mc_dir, "resourcepacks")
         os.makedirs(dst_dir, exist_ok=True)
 
-        pack_name = os.path.basename(self.resourcepack_source)
         dst_path = os.path.join(dst_dir, pack_name)
+        self.progress(None, f"Installing {RESOURCE_PACK_NAME}...")
 
         try:
             if os.path.isdir(self.resourcepack_source):
@@ -97,6 +148,8 @@ class ServerManager:
             return
 
         self._enable_resourcepack_in_options(pack_name)
+        if self.state:
+            self.state.mark("resourcepack", wanted)
 
     def _enable_resourcepack_in_options(self, pack_name):
         options_path = os.path.join(self.mc_dir, "options.txt")
@@ -138,6 +191,10 @@ class ServerManager:
 
     def setup_server_list(self):
         servers_path = os.path.join(self.mc_dir, "servers.dat")
+        wanted = fingerprint(SERVER_ENTRY_NAME, SERVER_ENTRY_IP)
+        if (self.state and self.state.matches("server_list", wanted)
+                and os.path.isfile(servers_path)):
+            return
         try:
             existing = read_servers_dat(servers_path)
             updated = False
@@ -149,6 +206,8 @@ class ServerManager:
             if not updated:
                 existing.insert(0, {"name": SERVER_ENTRY_NAME, "ip": SERVER_ENTRY_IP})
             write_servers_dat(servers_path, existing)
+            if self.state:
+                self.state.mark("server_list", wanted)
         except Exception as e:
             self.log(f"Could not update the multiplayer list: {e}")
 
@@ -156,19 +215,32 @@ class ServerManager:
     # server.properties hardening
     # ------------------------------------------------------------------
     def apply_server_properties(self):
-        """Force the security-relevant properties every launch.
+        """Force the security- and gameplay-critical properties every launch.
 
-        ``server-ip`` is the important one. Left blank (the shipped default)
-        the server binds 0.0.0.0 and anyone on the same coffee-shop Wi-Fi can
-        connect to the player's world. Unless LAN play was explicitly turned
-        on in Settings, we pin it to loopback so only this machine can reach it.
+        ``server-ip`` is the important one for safety. Left blank (the shipped
+        default) the server binds 0.0.0.0 and anyone on the same coffee-shop
+        Wi-Fi can connect to the player's world. Unless LAN play was explicitly
+        turned on in Settings, we pin it to loopback so only this machine can
+        reach it.
+
+        The rest come from ``catalog.json`` and exist to undo the ways a
+        *server* is more restrictive than the singleplayer world this map was
+        built for: flight is allowed rather than treated as cheating, command
+        blocks run, and the operator level is the one a world with cheats
+        gives you. Rewritten on every launch on purpose - the server itself
+        rewrites this file on shutdown, so anything set once does not stay set.
         """
         path = os.path.join(self.server_dir, "server.properties")
         if not os.path.isfile(path):
             return
 
         bind = self.settings.bind_address if self.settings else "127.0.0.1"
-        enforced = {
+
+        # Gameplay first, security second: the security block wins any overlap,
+        # so a hand-edited catalog can tune flight and command levels but can
+        # never unpick the loopback binding or switch RCON back on.
+        enforced = dict(SERVER_PROPERTIES)
+        enforced.update({
             "server-ip": "" if bind == "0.0.0.0" else bind,
             "server-port": str(SERVER_PORT),
             # RCON and query are remote-control surfaces this launcher never
@@ -181,7 +253,7 @@ class ServerManager:
             "online-mode": "false",
             "prevent-proxy-connections": "false",
             "snooper-enabled": "false",
-        }
+        })
 
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -221,9 +293,47 @@ class ServerManager:
             self.log("Server locked to this computer only (loopback).")
 
     # ------------------------------------------------------------------
+    def grant_operator(self, username):
+        """Make the player an operator, so every singleplayer command works.
+
+        ``allow-flight`` and ``enable-command-block`` get you most of the way,
+        but ``/gamemode``, ``/tp``, ``/give``, ``/time`` and the rest are gated
+        on operator level rather than on a property. A singleplayer world with
+        cheats grants exactly this, which is the behaviour the map assumes.
+
+        The entry has to be keyed by the UUID the *server* will compute, not
+        the player's real Mojang one: the world runs offline-mode so ViaProxy
+        can bridge versions, and an offline server derives the UUID from the
+        name. Writing the real UUID here would look right and grant nothing.
+
+        Rewritten each launch because the name can change between sessions -
+        signing in, signing out, or simply typing a different one.
+        """
+        if not username:
+            return
+        path = os.path.join(self.server_dir, "ops.json")
+        entry = {
+            "uuid": offline_uuid(username),
+            "name": username,
+            "level": SERVER_OP_LEVEL,
+            "bypassesPlayerLimit": True,
+        }
+        try:
+            os.makedirs(self.server_dir, exist_ok=True)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump([entry], f, indent=2)
+            os.replace(tmp, path)
+            self.log(f"{username} has full command access in this world.")
+        except Exception as e:
+            # Not fatal: the world still loads, the player just cannot use
+            # cheats. Worth a line in the log, not worth blocking a launch.
+            self.log(f"Could not grant command access: {e}")
+
+    # ------------------------------------------------------------------
     # Process
     # ------------------------------------------------------------------
-    def start_server(self, java_path, process_manager):
+    def start_server(self, java_path, process_manager, username=None):
         server_jar = os.path.join(self.server_dir, "server.jar")
         if not os.path.isfile(server_jar):
             raise LauncherError(
@@ -249,6 +359,7 @@ class ServerManager:
                 )
 
         self.apply_server_properties()
+        self.grant_operator(username)
         check_port_free(SERVER_PORT, log_fn=self.log)
 
         heap_mb = self.settings.server_ram_mb if self.settings else 2048

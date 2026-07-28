@@ -43,6 +43,26 @@
         "Changed: memory is now sized from the machine's RAM instead of a fixed 6 GB.",
         "Fixed: orphaned Java processes holding ports after a hard crash."
       ]
+    },
+    {
+      "version": "1.0.1",
+      "date": "2026-07-28",
+      "title": "Modpack & Ops",
+      "highlights": [
+        "Client mods now install from Modrinth instead of shipping in the installer",
+        "The world plays like singleplayer: operator commands, flight, no spawn protection",
+        "Skins render correctly for everyone on the offline-mode server",
+        "Repeat launches skip work that's already done"
+      ],
+      "notes": [
+        "Added: client modpack (Fabulously Optimized) installed and verified by SHA-512 from Modrinth on first run, replacing the bundled mod jars.",
+        "Added: CustomSkinLoader so player skins render correctly on the offline-mode server.",
+        "Added: install-state cache so Fabric, the modpack, the resource pack and the server list are skipped once already up to date.",
+        "Added: server.properties now forces operator-level permissions, flight and disables spawn protection, and the player is auto-opped so the world plays like the singleplayer map it's based on.",
+        "Added: the launcher window gets its own icon when run from a source checkout.",
+        "Changed: \"Clear Player Data\" now reinstalls the world from the local cache instead of re-downloading it.",
+        "Changed: refreshed branding - new app icon and logo, and an \"unofficial launcher\" label on the author credit."
+      ]
     }
   ]
 }

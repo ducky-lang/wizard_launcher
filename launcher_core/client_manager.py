@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import threading
 
@@ -10,20 +9,25 @@ except ImportError:
 
 from .constants import MC_VERSION, PROXY_PORT, client_jvm_args
 from .exceptions import LauncherError
+from .install_state import fingerprint
+from .modpack import ModpackInstaller
 from .platform_utils import hide_child_consoles, no_window_kwargs
 
 
 class ClientManager:
-    """Install Fabric + mods and launch the Minecraft client."""
+    """Install Fabric + the modpack and launch the Minecraft client."""
 
-    def __init__(self, log_fn, write_log_fn, mc_dir, mods_dir, settings=None,
-                 progress_fn=None):
+    def __init__(self, log_fn, write_log_fn, mc_dir, cache_dir, settings=None,
+                 progress_fn=None, state=None):
         self.log = log_fn
         self._write_log_file = write_log_fn
         self.mc_dir = mc_dir
-        self.mods_dir = mods_dir
+        self.cache_dir = cache_dir
         self.settings = settings
         self.progress = progress_fn or (lambda fraction, message=None: None)
+        self.state = state
+        self.modpack = ModpackInstaller(
+            log_fn, mc_dir, cache_dir, progress_fn=progress_fn, state=state)
         # prepare() runs on a background thread while the server boots. If a
         # launch fails at the server step the user can press Play again while
         # that thread is still downloading Fabric, and two installers writing
@@ -35,7 +39,7 @@ class ClientManager:
         """Everything that can happen before the server is up.
 
         Split out from :meth:`launch` so the launcher can install Fabric and
-        copy mods *while* the server is booting, instead of after it. On a
+        the mods *while* the server is booting, instead of after it. On a
         cold start that overlap is most of the difference between a 30 second
         wait and a 15 second one.
         """
@@ -51,17 +55,29 @@ class ClientManager:
             )
 
         os.makedirs(self.mc_dir, exist_ok=True)
-        os.makedirs(self.mods_dir, exist_ok=True)
 
         fabric_version_id = self._ensure_fabric(java_path)
-        self._sync_mods()
+        self.modpack.ensure()
         return fabric_version_id
 
     def _ensure_fabric(self, java_path):
+        # Recorded as well as detected: get_installed_versions() walks the
+        # versions folder and reads a JSON manifest per entry, which is work
+        # that produces the same answer every launch after the first.
+        wanted = fingerprint("fabric", MC_VERSION, self.mc_dir)
+        if self.state and self.state.matches("fabric", wanted):
+            recorded = self.state.get("fabric_version")
+            # Paired with an existence check, as everywhere else: the record
+            # is an optimisation, the folder is the truth.
+            if recorded and os.path.isdir(os.path.join(self.mc_dir, "versions", recorded)):
+                self.log(f"Client ready: {recorded}")
+                return recorded
+
         installed = [v["id"] for v in minecraft_launcher_lib.utils.get_installed_versions(self.mc_dir)]
         for vid in installed:
             if vid.startswith("fabric-loader-") and vid.endswith(f"-{MC_VERSION}"):
                 self.log(f"Client ready: {vid}")
+                self._remember_fabric(wanted, vid)
                 return vid
 
         self.log(f"Installing Minecraft {MC_VERSION} with Fabric (first run only)...")
@@ -108,44 +124,14 @@ class ClientManager:
             )
 
         self.log(f"Client installed: {version_id}")
+        self._remember_fabric(fingerprint("fabric", MC_VERSION, self.mc_dir), version_id)
         return version_id
 
-    def _sync_mods(self):
-        game_mods_dir = os.path.join(self.mc_dir, "mods")
-        os.makedirs(game_mods_dir, exist_ok=True)
-
-        if not os.path.isdir(self.mods_dir):
-            self.log("Mod folder not found; the client may not be able to join.")
+    def _remember_fabric(self, wanted, version_id):
+        if not self.state:
             return
-
-        bundled = {f for f in os.listdir(self.mods_dir) if f.lower().endswith(".jar")}
-        if not bundled:
-            self.log("No mods found to install - the client may not be able to join.")
-            return
-
-        copied = 0
-        for filename in bundled:
-            src = os.path.join(self.mods_dir, filename)
-            dst = os.path.join(game_mods_dir, filename)
-            try:
-                if not os.path.isfile(dst) or os.path.getmtime(src) > os.path.getmtime(dst):
-                    shutil.copy2(src, dst)
-                    copied += 1
-            except Exception as e:
-                self.log(f"Could not install mod {filename}: {e}")
-
-        # Remove stale mods from an older launcher version. Leaving an
-        # outdated ViaFabricPlus behind is a reliable way to get an
-        # "Outdated client" kick that looks like a launcher bug.
-        for filename in os.listdir(game_mods_dir):
-            if filename.lower().endswith(".jar") and filename not in bundled:
-                try:
-                    os.remove(os.path.join(game_mods_dir, filename))
-                    self._write_log_file(f"Removed stale mod: {filename}")
-                except Exception:
-                    pass
-
-        self.log(f"{len(bundled)} mods ready" + (f" ({copied} updated)" if copied else "."))
+        self.state.mark("fabric_version", version_id)
+        self.state.mark("fabric", wanted)
 
     # ------------------------------------------------------------------
     def launch(self, username, java_path, process_manager, fabric_version_id, account=None):

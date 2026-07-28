@@ -243,6 +243,142 @@ class DialogConstructionTests(unittest.TestCase):
         self.assertEqual(self.app.settings.get("server_ram_mb"), 0)
 
 
+def find_ink_animate_conflicts(control, path="root", seen=None, found=None):
+    """Collect Containers that set both ``ink`` and ``animate``.
+
+    Flet 0.24 cannot build that combination. Its Container emits an
+    ``AnimatedContainer`` that carries ``clipBehavior`` but drops the
+    decoration, and Flutter refuses to clip without one. Asserts are compiled
+    out of a release build, so instead of a readable error the widget throws
+    and Flutter paints a grey ``ErrorWidget`` over it and everything after it.
+
+    That is exactly how the Play button took the bottom half of the window
+    with it once - no Python traceback, no console message, just grey. The
+    combination is easy to reintroduce by accident because ``clipBehavior``
+    defaults to anti-alias for *any* Container with a ``border_radius``, so
+    nothing has to opt into clipping for the crash to happen.
+    """
+    seen = set() if seen is None else seen
+    found = [] if found is None else found
+    if control is None or not isinstance(control, ft.Control) or id(control) in seen:
+        return found
+    seen.add(id(control))
+
+    if (isinstance(control, ft.Container)
+            and getattr(control, "ink", False)
+            and getattr(control, "animate", None) is not None):
+        found.append(path)
+
+    for attr in ("content", "controls", "actions", "title", "tabs", "segments",
+                 "leading", "trailing", "error_content"):
+        child = getattr(control, attr, None)
+        children = child if isinstance(child, list) else [child]
+        for index, item in enumerate(children):
+            find_ink_animate_conflicts(item, f"{path}.{attr}[{index}]", seen, found)
+    return found
+
+
+class InkAnimateTests(unittest.TestCase):
+    """Guards the flet 0.24 Container combination that renders as grey."""
+
+    def test_theme_buttons_do_not_combine_ink_and_animate(self):
+        for builder in (
+            lambda: theme.icon_button(ft.icons.SETTINGS_ROUNDED, "s", None),
+            lambda: theme.action_button("Stop", ft.icons.STOP_CIRCLE_ROUNDED, None),
+            lambda: theme.primary_button("Go", None),
+        ):
+            self.assertEqual(find_ink_animate_conflicts(builder()), [])
+
+    def test_the_detector_actually_detects(self):
+        bad = ft.Container(ink=True, on_click=lambda e: None, border_radius=16,
+                           animate=ft.Animation(300))
+        self.assertEqual(find_ink_animate_conflicts(bad), ["root"])
+        nested = ft.Container(content=ft.Column([bad]))
+        self.assertEqual(find_ink_animate_conflicts(nested),
+                         ["root.content[0].controls[0]"])
+
+    def test_a_plain_ink_button_is_fine(self):
+        ok = ft.Container(ink=True, on_click=lambda e: None, border_radius=16)
+        self.assertEqual(find_ink_animate_conflicts(ok), [])
+
+
+def find_croppable_text(control, path="root", seen=None, found=None):
+    """Collect Text controls that a Row will cut off instead of wrapping.
+
+    A Text has no width of its own. Put one in a Row beside an Icon and the
+    Row hands it its full single-line width, so a sentence longer than the
+    dialog simply loses its tail - which is how "Your session is encrypted
+    with Windows DPAPI..." ended up truncated mid-word in the account dialog.
+    ``expand=True`` (or an explicit width) is what makes it wrap instead.
+
+    Rows that centre their children are exempt: those are button labels,
+    which are short by construction, and giving them ``expand`` would make
+    them fill the row and break the centring.
+    """
+    seen = set() if seen is None else seen
+    found = [] if found is None else found
+    if control is None or not isinstance(control, ft.Control) or id(control) in seen:
+        return found
+    seen.add(id(control))
+
+    if isinstance(control, ft.Row) and isinstance(control.controls, list):
+        centred = control.alignment == ft.MainAxisAlignment.CENTER
+        has_icon = any(isinstance(c, ft.Icon) for c in control.controls)
+        if has_icon and not centred:
+            for index, child in enumerate(control.controls):
+                if (isinstance(child, ft.Text)
+                        and not getattr(child, "expand", None)
+                        and getattr(child, "width", None) is None
+                        and len(str(child.value or "")) > 60):
+                    found.append(f"{path}.controls[{index}]: {str(child.value)[:40]}...")
+
+    for attr in ("content", "controls", "actions", "title", "tabs", "segments",
+                 "leading", "trailing", "error_content"):
+        child = getattr(control, attr, None)
+        children = child if isinstance(child, list) else [child]
+        for index, item in enumerate(children):
+            find_croppable_text(item, f"{path}.{attr}[{index}]", seen, found)
+    return found
+
+
+class TextCroppingTests(unittest.TestCase):
+    """Long labels beside an icon must wrap, not lose their tail."""
+
+    def setUp(self):
+        self.app = StubApp()
+
+    def test_the_detector_actually_detects(self):
+        long_text = "x" * 80
+        bad = ft.Row([ft.Icon(ft.icons.LOCK_ROUNDED), ft.Text(long_text)])
+        self.assertEqual(len(find_croppable_text(bad)), 1)
+        good = ft.Row([ft.Icon(ft.icons.LOCK_ROUNDED), ft.Text(long_text, expand=True)])
+        self.assertEqual(find_croppable_text(good), [])
+
+    def test_centred_button_labels_are_exempt(self):
+        row = ft.Row([ft.Icon(ft.icons.LOGOUT_ROUNDED), ft.Text("y" * 80)],
+                     alignment=ft.MainAxisAlignment.CENTER)
+        self.assertEqual(find_croppable_text(row), [])
+
+    def test_signed_in_account_dialog_wraps_the_encryption_note(self):
+        class FakeAccount:
+            username = "Foxy"
+            uuid = "0" * 32
+
+        self.app.account = FakeAccount()
+        account_dialog.show(self.app)
+        problems = find_croppable_text(self.app.opened[0])
+        self.assertEqual(problems, [], "text would be cropped: " + "; ".join(problems))
+
+    def test_every_dialog_wraps_its_long_labels(self):
+        for show in (account_dialog.show, settings_dialog.show,
+                     help_dialog.show, about_dialog.show):
+            app = StubApp()
+            show(app)
+            problems = find_croppable_text(app.opened[0])
+            self.assertEqual(problems, [],
+                             f"{show.__module__}: " + "; ".join(problems))
+
+
 class ThemeTests(unittest.TestCase):
     def test_palette_is_loaded_from_data(self):
         self.assertTrue(theme.GOLD.startswith("#"))

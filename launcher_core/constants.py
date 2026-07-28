@@ -108,7 +108,19 @@ RESOURCE_SHA256 = {
 # Rough install footprint, used by the first-run disk check. Deliberately an
 # estimate: being told "you need about 4 GB free" before a download starts is
 # worth far more than being told the exact number after it fails.
-DOWNLOAD_MB = MAP["approx_mb"] + RESOURCE_PACK["approx_mb"]
+#
+# The modpack is part of this now that the mods are fetched rather than
+# shipped - see the modpack section below, and note the disk check has to be
+# told about it or a player passes the check and then runs out of space
+# halfway through installing fifty jars.
+def _modpack_mb():
+    try:
+        return int(_section("modpack").get("approx_mb", 120))
+    except (TypeError, ValueError):
+        return 120
+
+
+DOWNLOAD_MB = MAP["approx_mb"] + RESOURCE_PACK["approx_mb"] + _modpack_mb()
 CLIENT_INSTALL_MB = _int("disk", "client_mb", 1400)
 DISK_HEADROOM_MB = _int("disk", "headroom_mb", 1000)
 REQUIRED_DISK_MB = DOWNLOAD_MB + CLIENT_INSTALL_MB + DISK_HEADROOM_MB
@@ -140,12 +152,76 @@ def _allowed_domains():
 ALLOWED_DOWNLOAD_DOMAINS = _allowed_domains()
 
 
-def is_allowed_download_host(host):
+def _host_in(host, domains):
     host = (host or "").lower().rstrip(".")
-    return any(
-        host == domain or host.endswith("." + domain)
-        for domain in ALLOWED_DOWNLOAD_DOMAINS
-    )
+    return any(host == domain or host.endswith("." + domain) for domain in domains)
+
+
+def is_allowed_download_host(host):
+    return _host_in(host, ALLOWED_DOWNLOAD_DOMAINS)
+
+
+# ---------------------------------------------------------------------------
+# Client modpack
+#
+# Installed from Modrinth on first run rather than bundled with the installer.
+# Everything is pinned in the catalog - version, URL and SHA-512 - so the
+# launcher never asks an API what "latest" is. A build therefore installs the
+# same mod set today and in a year, and an upstream that changes underneath us
+# fails the hash check instead of silently shipping different code.
+# ---------------------------------------------------------------------------
+def _modpack():
+    raw = _section("modpack")
+    extras = []
+    for entry in raw.get("extra_mods") or []:
+        if not isinstance(entry, dict) or not entry.get("path") or not entry.get("url"):
+            continue
+        extras.append({
+            "name": str(entry.get("name") or ""),
+            "path": str(entry["path"]),
+            "url": str(entry["url"]),
+            "sha512": str(entry.get("sha512") or "").strip(),
+        })
+    try:
+        approx = int(raw.get("approx_mb", 120))
+    except (TypeError, ValueError):
+        approx = 120
+    return {
+        "id": str(raw.get("id") or "fabulously-optimized"),
+        "name": str(raw.get("name") or "Fabulously Optimized"),
+        "version": str(raw.get("version") or ""),
+        "url": str(raw.get("url") or ""),
+        "sha512": str(raw.get("sha512") or "").strip(),
+        "approx_mb": approx,
+    }, extras
+
+
+MODPACK, MODPACK_EXTRA_MODS = _modpack()
+MODPACK_NAME = MODPACK["name"]
+MODPACK_MB = MODPACK["approx_mb"]
+
+
+def _allowed_modpack_domains():
+    raw = _section("modpack").get("allowed_domains")
+    domains = {
+        str(d).lower().strip().lstrip(".")
+        for d in raw or []
+        if isinstance(d, str) and d.strip()
+    }
+    return domains or {"modrinth.com"}
+
+
+ALLOWED_MODPACK_DOMAINS = _allowed_modpack_domains()
+
+
+def is_allowed_modpack_host(host):
+    """Mods come from Modrinth, not from the map's host.
+
+    A separate allow-list on purpose: widening the map's list to cover
+    Modrinth would also let a tampered catalog point the 1.1 GB world
+    download at a mod CDN, and the two have no reason to overlap.
+    """
+    return _host_in(host, ALLOWED_MODPACK_DOMAINS)
 
 
 # Retry policy for content downloads. A player on hotel Wi-Fi should not have
@@ -192,7 +268,38 @@ SERVER_ENTRY_IP = f"{SERVER_ENTRY_HOST}:{PROXY_PORT}"
 SERVER_KEEP_ON_CLEAR = {"server.jar", "eula.txt", "server.properties", "plugins"}
 
 PLAYER_DATA_WORLD_ITEMS = {"playerdata", "stats", "advancements"}
-PLAYER_DATA_SERVER_FILES = {"usercache.json"}
+PLAYER_DATA_SERVER_FILES = {"usercache.json", "ops.json", "whitelist.json"}
+
+
+# Properties forced into server.properties on every launch, on top of the
+# security block ServerManager applies itself. These are what turn a local
+# multiplayer server back into something that behaves like the singleplayer
+# world the map was designed for: every command a world with cheats allows,
+# and flight, which an unmodified server otherwise kicks you for.
+def _server_properties():
+    section = _section("server_properties")
+    return {
+        str(key): str(value)
+        for key, value in section.items()
+        if isinstance(key, str) and not key.startswith("_")
+        and isinstance(value, (str, int, float, bool))
+    } or {
+        "allow-flight": "true",
+        "enable-command-block": "true",
+        "op-permission-level": "4",
+        "function-permission-level": "2",
+        "spawn-protection": "0",
+        "broadcast-console-to-ops": "false",
+        "broadcast-rcon-to-ops": "false",
+    }
+
+
+SERVER_PROPERTIES = _server_properties()
+
+# Operator level written into ops.json for the person playing. 4 is the
+# vanilla maximum and the level a singleplayer world with cheats grants: /op,
+# /gamemode, /tp, /give, /time, and the rest.
+SERVER_OP_LEVEL = 4
 
 # 90s ceiling: a 1.1 GB world (chunk load + plugin init) can take much longer
 # than the old 22.5s budget on a slow disk, a cold file cache or a machine

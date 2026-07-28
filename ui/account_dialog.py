@@ -35,7 +35,7 @@ def _mode_card(mode, action):
                         ft.Icon(theme.icon_name(mode.get("icon")), size=17,
                                 color=theme.GOLD if is_signin else theme.TEXT_SUB),
                         ft.Text(mode["title"], size=13.5, color=theme.TEXT_MAIN,
-                                font_family=theme.FONT_BODY_SEMIBOLD),
+                                font_family=theme.FONT_BODY_SEMIBOLD, expand=True),
                     ],
                     spacing=8,
                 ),
@@ -126,7 +126,7 @@ def _show_signed_out(app):
                     ft.Icon(ft.icons.LOCK_ROUNDED, size=13, color=theme.SUCCESS),
                     theme.hint("Your password is never sent to or stored by this launcher. "
                                f"Tokens are encrypted with {crypto.describe_backend()}.",
-                               size=11),
+                               size=11, expand=True),
                 ],
                 spacing=7, vertical_alignment=ft.CrossAxisAlignment.START,
             ),
@@ -180,10 +180,12 @@ def _show_signed_in(app):
                 ft.Row(
                     [
                         ft.Icon(ft.icons.SHIELD_ROUNDED, size=17, color=theme.SUCCESS),
+                        # expand=True or the Row gives this its full one-line
+                        # width and the sentence is cut off mid-word.
                         theme.hint(
                             f"Your session is encrypted with {crypto.describe_backend()} and "
                             "kept on this computer only. It cannot be read from another "
-                            "account or another machine.", size=11.5),
+                            "account or another machine.", size=11.5, expand=True),
                     ],
                     spacing=10, vertical_alignment=ft.CrossAxisAlignment.START,
                 ),

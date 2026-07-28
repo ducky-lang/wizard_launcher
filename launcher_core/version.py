@@ -4,13 +4,13 @@ Bump VERSION here; the About dialog, the log header, the update check and
 the Inno Setup script all read from this one place.
 """
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 EDITION = "Beta Version"
 VERSION_STRING = f"v{VERSION} - {EDITION}"
 
 APP_NAME = "Wizard Launcher"
 APP_AUTHOR = "Foxy"
-APP_AUTHOR_HANDLE = "@.phungminh"
+APP_AUTHOR_HANDLE = "@.phungminh (unoffical launcher)"
 
 MAP_CREDIT = "The Floo Network"
 MAP_CREDIT_URL = "https://www.thefloonetwork.net/"
@@ -24,7 +24,7 @@ UPDATE_MANIFEST_URL = ""
 
 ABOUT_TEXT = (
     "Wizard Launcher exists so that stepping into Witchcraft and Wizardry takes "
-    "one click instead of an afternoon. No Java to install, no mods to sideload, "
+    "one click. No Java to install, no mods to sideload, "
     "no server console to babysit - just press play and walk into the castle.\n\n"
     "It was built by one person, for friends who wanted to see Hogwarts without "
     "fighting a config file first."
@@ -34,7 +34,8 @@ CREDITS = [
     ("Original map", "Witchcraft and Wizardry by The Floo Network"),
     ("Launcher", f"{APP_AUTHOR} ({APP_AUTHOR_HANDLE})"),
     ("Version bridging", "ViaProxy by RaphiMC"),
-    ("Client mods", "Fabric, Sodium, Iris, ViaFabricPlus and friends"),
+    ("Modpack", "Fabulously Optimized, via Modrinth"),
+    ("Skins", "CustomSkinLoader by xfl03"),
     ("Typefaces", "Cinzel and Poppins, via Google Fonts"),
 ]
 
