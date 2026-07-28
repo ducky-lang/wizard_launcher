@@ -335,9 +335,22 @@ class EmbeddedClientId:
 # Windows version resource
 # ---------------------------------------------------------------------------
 def _version_tuple():
-    parts = [int(p) for p in VERSION.split(".")]
-    while len(parts) < 4:
-        parts.append(0)
+    # VERSION may carry build metadata ("1.0.1+2") or a pre-release suffix; the
+    # Windows resource needs four integers. Take the dotted numeric core as the
+    # first fields and a trailing "+N" build number as the fourth.
+    core, _, build = VERSION.partition("+")
+    core = core.split("-", 1)[0]
+    parts = []
+    for p in core.split("."):
+        try:
+            parts.append(int(p))
+        except ValueError:
+            break
+    try:
+        build_no = int(build)
+    except ValueError:
+        build_no = 0
+    parts = (parts + [0, 0, 0])[:3] + [build_no]
     return tuple(parts[:4])
 
 

@@ -3,6 +3,19 @@
   "_comment": "Newest release first. The update dialog previews the entries newer than the running version; the About dialog shows the current one.",
   "releases": [
     {
+      "version": "1.0.1+2",
+      "date": "2026-07-28",
+      "title": "Your Mods, Your Folder",
+      "highlights": [
+        "The game folder button now opens the client folder where mods live",
+        "Mods you add yourself are kept across launcher restarts and pack updates"
+      ],
+      "notes": [
+        "Changed: 'Open game folder' now opens the Minecraft client folder (mods, config, resourcepacks) instead of the launcher's data root.",
+        "Fixed: mods you install yourself are no longer swept away when the modpack updates - only the launcher's own outdated jars are removed."
+      ]
+    },
+    {
       "version": "1.3.0",
       "date": "2026-07-23",
       "title": "Onboarding & Diagnostics",

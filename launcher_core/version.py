@@ -4,7 +4,7 @@ Bump VERSION here; the About dialog, the log header, the update check and
 the Inno Setup script all read from this one place.
 """
 
-VERSION = "1.0.1"
+VERSION = "1.0.1+2"
 EDITION = "Beta Version"
 VERSION_STRING = f"v{VERSION} - {EDITION}"
 

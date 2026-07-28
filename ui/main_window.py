@@ -1119,8 +1119,18 @@ class LauncherApp:
         self.toast("Attach a diagnostic report to the issue if you have one.")
 
     def open_data_folder(self):
-        if not open_path(self.base_dir):
-            self.toast(f"Game folder: {self.base_dir}")
+        # "Game folder" takes the player to the Minecraft client folder - the
+        # one holding mods/, config/ and resourcepacks/ - so they can drop
+        # their own mods straight in, rather than the launcher's data root,
+        # which holds no game files. Create it if the game has not been
+        # launched yet so the button always lands somewhere useful.
+        try:
+            os.makedirs(self.mc_dir, exist_ok=True)
+        except OSError:
+            pass
+        target = self.mc_dir if os.path.isdir(self.mc_dir) else self.base_dir
+        if not open_path(target):
+            self.toast(f"Game folder: {target}")
 
     def apply_settings_changes(self):
         """React to settings the running window can honour immediately."""

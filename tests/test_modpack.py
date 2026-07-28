@@ -210,6 +210,19 @@ class SweepTests(unittest.TestCase):
             self.messages.append, os.path.join(self.dir, "nope"), self.dir)
         installer._sweep_foreign_mods([])
 
+    def test_player_mods_survive_a_pack_upgrade(self):
+        # Once the launcher owns the folder (a previous manifest exists), a jar
+        # the player added is not one of ours and must not be swept - even when
+        # a modpack upgrade drops the old bundled jar that replaced it.
+        self._touch("my-cool-mod.jar")     # the player's own
+        self._touch("sodium-0.5.3.jar")    # ours, from the previous pack
+        self._touch("sodium-0.5.8.jar")    # ours, from the new pack
+        previous = {"files": ["mods/sodium-0.5.3.jar"]}
+        self.installer._sweep_foreign_mods(["mods/sodium-0.5.8.jar"], previous)
+        self.assertTrue(os.path.exists(os.path.join(self.mods, "my-cool-mod.jar")))
+        self.assertTrue(os.path.exists(os.path.join(self.mods, "sodium-0.5.8.jar")))
+        self.assertFalse(os.path.exists(os.path.join(self.mods, "sodium-0.5.3.jar")))
+
 
 class ManifestTests(unittest.TestCase):
     def setUp(self):

@@ -410,6 +410,11 @@ class ModpackInstaller:
         self.log(f"Installing {name} {version} (first run only)...")
         self.progress(0.0, f"Fetching {name}...")
 
+        # Read before we overwrite it: this records which jars a past install
+        # of ours put in mods/, so the sweep can tell a stale bundled mod from
+        # one the player added themselves.
+        previous = self._read_manifest()
+
         os.makedirs(self.mc_dir, exist_ok=True)
         os.makedirs(self.cache_dir, exist_ok=True)
 
@@ -458,7 +463,7 @@ class ModpackInstaller:
             )
 
         installed += self._download_extras()
-        self._sweep_foreign_mods(installed)
+        self._sweep_foreign_mods(installed, previous)
         self._write_manifest(installed, wanted)
         if self.state:
             self.state.mark("modpack", wanted)
@@ -568,23 +573,46 @@ class ModpackInstaller:
             installed.append(path)
         return installed
 
-    def _sweep_foreign_mods(self, installed):
-        """Delete jars in ``mods/`` that this install does not own.
+    def _sweep_foreign_mods(self, installed, previous=None):
+        """Delete stale launcher-owned jars in ``mods/``, keeping the player's.
 
-        This is what migrates a player off the old bundled mod set, and what
-        stops a jar from a previous pack version surviving into a new one -
-        two copies of Sodium is an instant crash on launch.
+        This stops a jar from a previous pack version surviving into a new one
+        - two copies of Sodium is an instant crash on launch - and migrates a
+        player off the old bundled mod set.
+
+        The rule turns on whether the launcher already owns this folder:
+
+        * **A previous manifest exists.** Then a jar the player dropped in was
+          never one of ours, so it is not in the previous file list and is left
+          untouched. Only jars a past install of ours put here, and no longer
+          wants, are removed. This is what lets players keep their own mods
+          across a modpack upgrade instead of losing them on the next launch.
+        * **No previous manifest.** This is the first migration off the old
+          bundled set, where every jar in the folder was shipped by the
+          launcher. Then anything not in the new install is swept, as before.
         """
         mods_dir = os.path.join(self.mc_dir, "mods")
         if not os.path.isdir(mods_dir):
             return
         keep = {os.path.normcase(p.replace("/", os.sep)) for p in installed}
+
+        owned = None
+        if previous and isinstance(previous.get("files"), list):
+            owned = {
+                os.path.normcase(p.replace("/", os.sep))
+                for p in previous["files"] if isinstance(p, str)
+            }
+
         removed = 0
         for filename in os.listdir(mods_dir):
             if not filename.lower().endswith((".jar", ".jar.disabled")):
                 continue
             relative = os.path.normcase(os.path.join("mods", filename))
             if relative in keep:
+                continue
+            # Once the launcher owns the folder, a jar it never installed is the
+            # player's - leave it in place.
+            if owned is not None and relative not in owned:
                 continue
             try:
                 os.remove(os.path.join(mods_dir, filename))
