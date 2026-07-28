@@ -28,7 +28,7 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion} - {#MyAppEdition}
 AppPublisher={#MyAppPublisher}
-VersionInfoVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersionNumeric}
 
 ; Per-user install: no UAC prompt, no shared state, clean uninstall.
 PrivilegesRequired=lowest
