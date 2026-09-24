@@ -24,7 +24,7 @@ class ClientRunner(
     class Plan(val command: List<String>, val mainClass: String, val gameArgs: List<String>)
 
     fun plan(profile: VersionProfile, account: Account, joinAddress: String?): Plan {
-        val classpath = (profile.libraries.map { paths.libraries.resolve(it.path) } + profile.clientJar + bootJar)
+        val classpath: List<Path> = profile.libraries.map { paths.libraries.resolve(it.path) } + listOf(profile.clientJar, bootJar)
         val missing = classpath.filterNot(Files::isRegularFile)
         if (missing.isNotEmpty()) {
             Log.file("Missing classpath entries: " + missing.joinToString())
