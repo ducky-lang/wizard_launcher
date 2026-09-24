@@ -38,5 +38,10 @@ class ClientRunnerTest {
         assertTrue(cp.all { Path.of(it).isAbsolute })
         assertFalse(plan.command.any { it.contains("Harry") && it.contains("accessToken") })
         assertTrue("--quickPlayMultiplayer" !in plan.command)
+        assertFalse("-Dwizard.waitForWorld=true" in plan.command)
+
+        val waiting = ClientRunner(paths, settings, ProcessSupervisor(tmp.resolve("state.json")), Path.of("java"), boot)
+            .plan(profile, Account.offline("Harry"), "127.0.0.1:25566", waitForWorld = true)
+        assertTrue(waiting.command.indexOf("-Dwizard.waitForWorld=true") in 1 until waiting.command.indexOf("dev.wizardlauncher.boot.SecureBoot"))
     }
 }

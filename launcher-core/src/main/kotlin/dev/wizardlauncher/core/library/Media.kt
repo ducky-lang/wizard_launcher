@@ -7,7 +7,9 @@ import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import javax.imageio.IIOImage
 import javax.imageio.ImageIO
+import javax.imageio.ImageWriteParam
 
 data class Screenshot(val file: String, val takenAt: Long, val sizeBytes: Long)
 
@@ -50,6 +52,81 @@ class ScreenshotLibrary(private val gameDir: Path, private val cacheDir: Path) {
 
     fun delete(name: String) {
         resolve(name)?.let(Files::deleteIfExists)
+    }
+}
+
+class HeroArt(private val gameDir: Path, private val cacheDir: Path, private val screenshots: ScreenshotLibrary) {
+    fun image(): ByteArray? {
+        val source = packArt() ?: screenshots.list().firstOrNull()?.let { screenshots.resolve(it.file) } ?: return null
+        val stamp = Files.getLastModifiedTime(source).toMillis()
+        val cached = cacheDir.resolve("hero").resolve("hero-${source.fileName.toString().hashCode().toUInt()}-$stamp.jpg")
+        if (Files.isRegularFile(cached)) return Files.readAllBytes(cached)
+        return runCatching {
+            val image = ImageIO.read(source.toFile()) ?: return null
+            val top = photoTop(image)
+            val height = image.height - top
+            val width = minOf(1920, image.width)
+            val outHeight = (height * width.toDouble() / image.width).toInt().coerceAtLeast(1)
+            val out = BufferedImage(width, outHeight, BufferedImage.TYPE_INT_RGB)
+            out.createGraphics().apply {
+                setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+                setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+                drawImage(image, 0, 0, width, outHeight, 0, top, image.width, image.height, null)
+                dispose()
+            }
+            val bytes = jpeg(out, 0.92f)
+            Files.createDirectories(cached.parent)
+            Files.list(cached.parent).use { old -> old.filter { it != cached }.forEach { runCatching { Files.deleteIfExists(it) } } }
+            Files.write(cached, bytes)
+            bytes
+        }.onFailure { Log.file("Home artwork could not be prepared: ${it.message}") }.getOrNull()
+    }
+
+    private fun jpeg(image: BufferedImage, quality: Float): ByteArray {
+        val writer = ImageIO.getImageWritersByFormatName("jpg").next()
+        val out = ByteArrayOutputStream()
+        ImageIO.createImageOutputStream(out).use { stream ->
+            writer.output = stream
+            val params = writer.defaultWriteParam.apply {
+                compressionMode = ImageWriteParam.MODE_EXPLICIT
+                compressionQuality = quality
+            }
+            writer.write(null, IIOImage(image, null, null), params)
+            writer.dispose()
+        }
+        return out.toByteArray()
+    }
+
+    private fun packArt(): Path? {
+        val packs = gameDir.resolve("resourcepacks")
+        if (!Files.isDirectory(packs)) return null
+        val candidates = Files.list(packs).use { s -> s.filter(Files::isDirectory).toList() }
+            .sortedBy { if (it.fileName.toString() == "Resource Pack") 0 else 1 }
+        return candidates.map { it.resolve(ART) }.firstOrNull(Files::isRegularFile)
+    }
+
+    private fun photoTop(image: BufferedImage): Int {
+        var y = image.height - 1
+        while (y > 0 && !mostlyDark(image, y - 1)) y--
+        return if (image.height - y < image.height / 4) 0 else y
+    }
+
+    private fun mostlyDark(image: BufferedImage, y: Int): Boolean {
+        val step = maxOf(1, image.width / 64)
+        var dark = 0
+        var total = 0
+        for (x in 0 until image.width step step) {
+            val rgb = image.getRGB(x, y)
+            val alpha = rgb ushr 24
+            val luma = ((rgb shr 16 and 0xFF) * 3 + (rgb shr 8 and 0xFF) * 6 + (rgb and 0xFF)) / 10
+            if (alpha < 16 || luma < 10) dark++
+            total++
+        }
+        return dark * 2 > total
+    }
+
+    companion object {
+        const val ART = "assets/minecraft/textures/guis/main_menu/background/background.png"
     }
 }
 

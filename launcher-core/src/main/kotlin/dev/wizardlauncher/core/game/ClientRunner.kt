@@ -23,7 +23,7 @@ class ClientRunner(
 ) {
     class Plan(val command: List<String>, val mainClass: String, val gameArgs: List<String>)
 
-    fun plan(profile: VersionProfile, account: Account, joinAddress: String?): Plan {
+    fun plan(profile: VersionProfile, account: Account, joinAddress: String?, waitForWorld: Boolean = false): Plan {
         val classpath: List<Path> = profile.libraries.map { paths.libraries.resolve(it.path) } + listOf(profile.clientJar, bootJar)
         val missing = classpath.filterNot(Files::isRegularFile)
         if (missing.isNotEmpty()) {
@@ -62,6 +62,7 @@ class ClientRunner(
         command += javaExe.toString()
         command += JvmFlags.client(settings.effectiveClientRamMb)
         command += "-Djava.awt.headless=true"
+        if (waitForWorld && joinAddress != null) command += "-Dwizard.waitForWorld=true"
         command += jvm
         command += "dev.wizardlauncher.boot.SecureBoot"
         return Plan(command, profile.mainClass, game)
@@ -70,8 +71,8 @@ class ClientRunner(
     fun command(profile: VersionProfile, account: Account, joinAddress: String?): List<String> =
         plan(profile, account, joinAddress).command
 
-    fun launch(profile: VersionProfile, account: Account, joinAddress: String?): Process {
-        val plan = plan(profile, account, joinAddress)
+    fun launch(profile: VersionProfile, account: Account, joinAddress: String?, waitForWorld: Boolean = false): Process {
+        val plan = plan(profile, account, joinAddress, waitForWorld)
         val command = plan.command
         val game = plan.gameArgs
         GameOptions.setFullscreen(paths.gameDir.resolve("options.txt"), settings.fullscreen)

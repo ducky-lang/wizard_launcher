@@ -14,6 +14,7 @@ import dev.wizardlauncher.core.install.ContentInstaller
 import dev.wizardlauncher.core.install.OfflineBundle
 import dev.wizardlauncher.core.install.Progress
 import dev.wizardlauncher.core.library.CrashReports
+import dev.wizardlauncher.core.library.HeroArt
 import dev.wizardlauncher.core.library.ModLibrary
 import dev.wizardlauncher.core.library.PackLibrary
 import dev.wizardlauncher.core.library.ScreenshotLibrary
@@ -55,6 +56,7 @@ class Bridge(private val launcher: Launcher, private val host: Host) {
     private val shaders get() = ShaderLibrary(paths.gameDir)
     private val shots get() = ScreenshotLibrary(paths.gameDir, paths.root.resolve("cache"))
     private val worlds get() = Worlds(paths.worldDir, paths.backups)
+    private val hero get() = HeroArt(paths.gameDir, paths.root.resolve("cache"), shots)
     private val avatars = Avatars(launcher)
     @Volatile private var gameState = "idle"
     @Volatile private var update: UpdateInfo? = null
@@ -278,6 +280,7 @@ class Bridge(private val launcher: Launcher, private val host: Host) {
         val kind = if (slash < 0) path else path.substring(0, slash)
         val name = if (slash < 0) "" else path.substring(slash + 1)
         return when (kind) {
+            "hero.jpg" -> hero.image()?.let { it to "image/jpeg" }
             "logo.png" -> Bridge::class.java.getResourceAsStream("/dev/wizardlauncher/app/logo.png")?.use { it.readBytes() }?.let { it to "image/png" }
             "avatar" -> avatars.get(name)?.let { it to "image/png" }
             "modicon" -> mods.icon(name)?.let { it to "image/png" }

@@ -51,7 +51,7 @@ A bundled Fabric mod teaches Minecraft 1.20.1 to **read 1.13–1.19 resource pac
 <td valign="top">
 
 ### Chromium interface
-A fluid, animated UI rendered by an embedded Chromium engine (JCEF). It animates only GPU-friendly properties, pauses when hidden, and fully honours *reduced motion*.
+A fast, polished UI rendered by an embedded Chromium engine (JCEF). Motion is limited to page transitions and GPU-friendly effects, nothing redraws while the window is idle, and *reduced motion* is fully honoured.
 
 </td>
 <td valign="top">
@@ -84,7 +84,7 @@ A fluid, animated UI rendered by an embedded Chromium engine (JCEF). It animates
 
 | Area | What you get |
 |---|---|
-| **Play** | One button installs, repairs and launches. It shows staged progress (castle → game files → mods → portal → launch) with live speed. The world saves and stops by itself when Minecraft exits, even if the launcher was closed. |
+| **Play** | One button installs, repairs and launches. It shows staged progress (castle → game files → mods → portal → launch) with live speed. The world boots while Minecraft loads, and Minecraft waits on an *Opening the castle gates…* screen, then joins by itself as soon as the world is ready. The world saves and stops by itself when Minecraft exits, even if the launcher was closed. |
 | **Accounts** | Microsoft sign-in with a device code, so your password is only typed on Microsoft's site. Offline players are also supported, and you can switch between several accounts with one click. Signed-in players keep playing when offline, using their saved profile. |
 | **Library** | Mods: enable, disable, add and remove, with modpack mods protected. Resource packs: enable, disable, add and remove, with 1.16.5 packs badged as *read natively* and an optional export to a 1.20.1 zip. Shader packs: add and remove. |
 | **Screenshots** | A gallery with thumbnails cached on disk, a lightbox with keyboard navigation, and open and delete actions. |
@@ -119,7 +119,7 @@ flowchart LR
 | `server-host` | Java | Runs the 1.16.5 server and ViaProxy side by side in one JVM, and saves on exit |
 | `client-boot` | Java | Receives the game arguments over stdin and starts Minecraft |
 | `pack-legacy` | Java | The translation engine for older resource packs, shared by the mod and the export tool |
-| `legacy-mod` | Java (Fabric) | Serves older packs to 1.20.1 through a translating resource layer |
+| `legacy-mod` | Java (Fabric) | Serves older packs to 1.20.1 through a translating resource layer, and holds the one-click join until the world is ready |
 
 The installer carries its own Java 17 runtime. That single runtime runs the launcher, the client and the world server, so there is no Java to download, find or configure.
 
@@ -138,6 +138,8 @@ The castle's resource pack was made for **1.16.5** (`pack_format` 6). Instead of
 | Older `pack_format` is flagged *incompatible* | The pack is listed as compatible |
 
 Any pack from **1.13 to 1.19.4** benefits, with rules gated by the version each change arrived in. A report for every pack is written to `logs/wizard-legacy-packs/`.
+
+Adaptation runs on a background thread, so the game keeps answering the world while a large pack loads. The result is cached in memory and under `cache/wizard-legacy-packs/`. The cache is keyed by the pack's files, the rules and the adapter revision, so later launches reuse it and any change to the pack is picked up. A file the game lists but cannot read is skipped with a note in the report instead of failing the whole pack.
 
 ### Defining block states
 

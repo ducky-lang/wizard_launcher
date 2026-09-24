@@ -163,35 +163,19 @@
     $("#accountChip").innerHTML = `${avatar(a)}<div class="who"><b>${esc(a ? a.name : t("acct.none"))}</b><span>${a ? (a.type === "msa" ? t("acct.ms") : t("acct.offline")) : t("acct.add.offline")}</span></div>${ICONS.chevron}`;
   }
 
-  const CASTLE = `<svg viewBox="0 0 440 300" aria-hidden="true">
-    <defs>
-      <radialGradient id="moonGlow"><stop offset="0" stop-color="#fff6d0" stop-opacity=".9"/><stop offset="1" stop-color="#fff6d0" stop-opacity="0"/></radialGradient>
-      <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1832"/><stop offset="1" stop-color="#0a0913"/></linearGradient>
-      <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#15122a"/><stop offset="1" stop-color="#07060d"/></linearGradient>
-    </defs>
-    <g class="moon"><circle cx="352" cy="70" r="70" fill="url(#moonGlow)" opacity=".5"/><circle cx="352" cy="70" r="30" fill="#fff1c1"/><circle cx="340" cy="62" r="5" fill="#f0dfa8"/><circle cx="360" cy="80" r="4" fill="#f0dfa8"/></g>
-    <g fill="#fff" opacity=".7"><circle cx="60" cy="40" r="1.2"/><circle cx="120" cy="22" r="1"/><circle cx="250" cy="30" r="1.4"/><circle cx="410" cy="150" r="1"/><circle cx="30" cy="120" r="1"/><circle cx="290" cy="80" r="1"/></g>
-    <path d="M0 300 L0 250 Q110 215 220 238 T440 232 L440 300 Z" fill="url(#hill)"/>
-    <g fill="url(#stone)" stroke="rgba(242,193,78,.25)" stroke-width="1">
-      <path d="M150 250 V135 h12 v-10 h12 v10 h12 v-10 h12 v10 h12 v-10 h12 v10 h12 v-10 h12 v10 h12 v-10 h12 v10 h12 V250 Z"/>
-      <path d="M92 252 V95 h46 V252 Z"/><path d="M86 97 L115 38 L144 97 Z"/>
-      <path d="M302 252 V108 h44 V252 Z"/><path d="M296 110 L324 52 L352 110 Z"/>
-      <path d="M200 135 V70 h40 v65 Z"/><path d="M194 72 L220 14 L246 72 Z"/>
-      <path d="M60 256 V168 h28 V256 Z"/><path d="M56 170 L74 136 L92 170 Z"/>
-      <path d="M350 256 V176 h26 V256 Z"/><path d="M346 178 L363 146 L380 178 Z"/>
-    </g>
-    <path class="flag" d="M220 14 v-12 l18 5 -18 5" fill="#f2c14e"/>
-    <path class="flag" d="M115 38 v-10 l14 4 -14 4" fill="#8b7ae8"/>
-    <path class="flag" d="M324 52 v-10 l14 4 -14 4" fill="#8b7ae8"/>
-    <g>
-      <rect class="win" x="108" y="120" width="6" height="11" rx="3"/><rect class="win" x="120" y="160" width="6" height="11" rx="3"/><rect class="win" x="108" y="200" width="6" height="11" rx="3"/>
-      <rect class="win" x="316" y="130" width="6" height="11" rx="3"/><rect class="win" x="328" y="175" width="6" height="11" rx="3"/><rect class="win" x="316" y="215" width="6" height="11" rx="3"/>
-      <rect class="win" x="215" y="90" width="10" height="16" rx="5"/><rect class="win" x="172" y="165" width="8" height="13" rx="4"/><rect class="win" x="258" y="165" width="8" height="13" rx="4"/>
-      <rect class="win" x="190" y="200" width="8" height="13" rx="4"/><rect class="win" x="240" y="200" width="8" height="13" rx="4"/><rect class="win" x="70" y="195" width="5" height="9" rx="2.5"/>
-      <rect class="win" x="360" y="200" width="5" height="9" rx="2.5"/>
-    </g>
-    <path d="M206 250 v-26 a14 14 0 0 1 28 0 v26 Z" fill="#05040a" stroke="rgba(242,193,78,.35)"/>
-  </svg>`;
+  function bindHeroArt() {
+    const art = $("#heroArt");
+    if (!art) return;
+    art.addEventListener("load", () => art.classList.add("loaded"), { once: true });
+    art.addEventListener("error", () => art.remove(), { once: true });
+  }
+
+  function retryHeroArt() {
+    const hero = $(".hero");
+    if (!hero || $("#heroArt", hero)) return;
+    hero.insertAdjacentHTML("afterbegin", `<img class="hero-art" id="heroArt" src="/media/hero.jpg?${Date.now()}" alt="">`);
+    bindHeroArt();
+  }
 
   function playLabel() {
     const g = state.game.state;
@@ -204,7 +188,9 @@
     if (!rendered.home || force) {
       const info = state.info || {};
       el.innerHTML = `
-        <section class="hero stagger">
+        <section class="hero">
+          <img class="hero-art" id="heroArt" src="/media/hero.jpg" alt="">
+          <div class="hero-shade"></div>
           <div class="hero-copy">
             <div class="eyebrow">${t("hero.eyebrow")}</div>
             <h2>${t("hero.title")}</h2>
@@ -226,9 +212,9 @@
               <div class="steps" id="steps">${["prepare", "game", "mods", "portal", "launch"].map((s) => `<span>${t("step." + s)}</span>`).join("")}</div>
             </div>
           </div>
-          <div class="castle">${CASTLE}</div>
         </section>
         <div class="grid cols-3 stagger" id="homeCards"></div>`;
+      bindHeroArt();
       $("#playBtn").addEventListener("click", onPlay);
       $("#stopBtn").addEventListener("click", () => call("game.stop"));
       rendered.home = true;
@@ -302,13 +288,9 @@
     $("#playHint").textContent = g.state === "idle" ? (info.offlineReady ? t("play.hint.ready") : t("play.hint.first", { gb: info.downloadGb || 3 })) : "";
   }
 
-  async function onPlay(e) {
-    const btn = $("#playBtn");
+  async function onPlay() {
     if (state.game.state !== "idle" && state.game.state !== "error") return;
-    FX.ripple(btn, e);
     if (!state.selected) { openAccountMenu(); return; }
-    const r = btn.getBoundingClientRect();
-    FX.burst(r.left + r.width / 2, r.top + r.height / 2);
     state.game = { state: "launching", fraction: null, message: "", step: 0 };
     updatePlay();
     try { await call("game.play"); } catch (err) { state.game = { state: "idle" }; updatePlay(); }
@@ -531,17 +513,23 @@
     if (state.follow) box.scrollTop = box.scrollHeight;
   }
 
-  function appendLog(line) {
-    state.logs.push(line);
+  function appendLogs(lines) {
+    state.logs.push(...lines);
     if (state.logs.length > 4000) state.logs.splice(0, state.logs.length - 4000);
     const box = $("#console");
     if (!box || state.page !== "console") return;
-    if (state.filter && !line.toLowerCase().includes(state.filter)) return;
-    const div = document.createElement("div");
-    div.className = logClass(line) + " l-new";
-    div.textContent = line;
-    box.appendChild(div);
-    while (box.childElementCount > 1500) box.firstElementChild.remove();
+    const frag = document.createDocumentFragment();
+    for (const line of lines) {
+      if (state.filter && !line.toLowerCase().includes(state.filter)) continue;
+      const div = document.createElement("div");
+      div.className = logClass(line);
+      div.textContent = line;
+      frag.appendChild(div);
+    }
+    if (!frag.childNodes.length) return;
+    box.appendChild(frag);
+    let extra = box.childElementCount - 1500;
+    while (extra-- > 0) box.firstElementChild.remove();
     if (state.follow) box.scrollTop = box.scrollHeight;
   }
 
@@ -760,10 +748,8 @@
       $$("[data-acct]", m).forEach((b) => b.addEventListener("click", () => (b.dataset.acct === "ms" ? microsoftLogin(draw) : offlineLogin(draw))));
       $$("[data-prof]", m).forEach((b) => b.addEventListener("click", () => { profile = b.dataset.prof; call("settings.set", { memory_profile: profile }); draw(); }));
       $('[data-nav="back"]', m).addEventListener("click", () => { step = Math.max(0, step - 1); draw(); });
-      $('[data-nav="next"]', m).addEventListener("click", async (e) => {
+      $('[data-nav="next"]', m).addEventListener("click", async () => {
         if (step === 4) {
-          const r = e.currentTarget.getBoundingClientRect();
-          FX.burst(r.left + r.width / 2, r.top + r.height / 2, 30);
           m.close();
           state.settings = await WL.call("settings.get");
           state.info = await WL.call("app.info");
@@ -795,17 +781,13 @@
   async function refreshInfo() {
     state.info = await WL.call("app.info").catch(() => state.info);
     renderChips();
-    if (state.page === "home") renderHomeCards();
+    if (state.page === "home") { renderHomeCards(); retryHeroArt(); }
   }
 
   function bindEvents() {
     WL.on("launch.state", (d) => {
       const prev = state.game.state;
       state.game = Object.assign({}, state.game, d);
-      if (d.state === "playing" && prev !== "playing") {
-        const btn = $("#playBtn");
-        if (btn) { const r = btn.getBoundingClientRect(); FX.burst(r.left + r.width / 2, r.top + r.height / 2, 34); }
-      }
       if (d.state === "idle" && prev === "playing") toast("info", t("toast.gameClosed"));
       if (d.state === "error" && d.message) { toast("err", t("toast.error"), d.message); state.game.state = "idle"; }
       updatePlay(); renderChips();
@@ -817,7 +799,7 @@
       if (state.game.state === "idle") state.game.state = "launching";
       updatePlay();
     });
-    WL.on("log", (d) => appendLog(d.line));
+    WL.on("logs", (d) => appendLogs(d.lines || []));
     WL.on("game.crash", (d) => crashDialog(d));
     WL.on("accounts.msResult", async (d) => {
       if (d.ok) {
@@ -866,7 +848,6 @@
       state.settings = state.settings || { language: "en", animations: true };
       state.info = state.info || {};
     }
-    FX.init();
     FX.setEnabled(state.settings.animations !== false);
     document.documentElement.lang = lang;
     buildNav();

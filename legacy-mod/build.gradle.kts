@@ -3,7 +3,7 @@ plugins {
     java
 }
 
-version = "2.0.0"
+version = "2.0.1"
 group = "dev.wizardlauncher"
 
 base { archivesName.set("wizard-legacy-packs") }

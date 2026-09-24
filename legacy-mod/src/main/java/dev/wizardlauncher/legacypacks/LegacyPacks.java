@@ -1,7 +1,6 @@
 package dev.wizardlauncher.legacypacks;
 
 import dev.wizardlauncher.legacy.LegacyTranslator;
-import dev.wizardlauncher.legacy.Overlay;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -51,13 +50,7 @@ public final class LegacyPacks {
             if (view.namespaces().isEmpty()) {
                 return pack;
             }
-            long started = System.nanoTime();
-            Overlay overlay = LegacyTranslator.translate(view, format, extraRules(), null);
-            LOGGER.info("Reading '{}' (pack_format {}) natively: {} file(s) adapted, {} alias(es), {} note(s) in {} ms",
-                pack.packId(), format, overlay.files().size(), overlay.aliases().size(), overlay.warnings().size(),
-                (System.nanoTime() - started) / 1_000_000);
-            writeReport(pack.packId(), overlay);
-            return new LegacyPackResources(pack, overlay);
+            return new LegacyPackResources(pack, OverlayCache.load(pack, view, format, extraRules()));
         } catch (Exception e) {
             LOGGER.error("Could not adapt '{}'; loading it unchanged", pack.packId(), e);
             return pack;
@@ -74,17 +67,6 @@ public final class LegacyPacks {
         } catch (Exception e) {
             LOGGER.warn("Ignoring unreadable {}", file, e);
             return List.of();
-        }
-    }
-
-    private static void writeReport(String packId, Overlay overlay) {
-        try {
-            Path dir = FabricLoader.getInstance().getGameDir().resolve("logs").resolve("wizard-legacy-packs");
-            Files.createDirectories(dir);
-            String name = packId.replaceAll("[^A-Za-z0-9._-]", "_") + ".txt";
-            Files.writeString(dir.resolve(name), overlay.report(), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            LOGGER.debug("Could not write the pack report", e);
         }
     }
 }

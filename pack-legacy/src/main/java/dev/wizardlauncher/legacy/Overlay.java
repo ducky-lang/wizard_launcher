@@ -1,10 +1,22 @@
 package dev.wizardlauncher.legacy;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 public final class Overlay {
     private final Map<String, byte[]> files = new LinkedHashMap<>();
@@ -81,5 +93,66 @@ public final class Overlay {
             warnings.forEach(w -> b.append("  ! ").append(w).append('\n'));
         }
         return b.toString();
+    }
+
+    public void write(OutputStream out) throws IOException {
+        JsonObject index = new JsonObject();
+        index.addProperty("revision", LegacyTranslator.REVISION);
+        index.addProperty("source_format", sourceFormat);
+        JsonArray names = new JsonArray();
+        files.keySet().forEach(names::add);
+        index.add("files", names);
+        JsonObject aliasJson = new JsonObject();
+        aliases.forEach(aliasJson::addProperty);
+        index.add("aliases", aliasJson);
+        JsonArray infoJson = new JsonArray();
+        info.forEach(infoJson::add);
+        index.add("info", infoJson);
+        JsonArray warnJson = new JsonArray();
+        warnings.forEach(warnJson::add);
+        index.add("warnings", warnJson);
+        ZipOutputStream zip = new ZipOutputStream(out);
+        zip.putNextEntry(new ZipEntry("overlay.json"));
+        zip.write(index.toString().getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+        int i = 0;
+        for (byte[] data : files.values()) {
+            zip.putNextEntry(new ZipEntry("f/" + i++));
+            zip.write(data);
+            zip.closeEntry();
+        }
+        zip.finish();
+    }
+
+    public static Overlay read(InputStream in) throws IOException {
+        ZipInputStream zip = new ZipInputStream(in);
+        JsonObject index = null;
+        Map<Integer, byte[]> blobs = new HashMap<>();
+        for (ZipEntry e; (e = zip.getNextEntry()) != null; ) {
+            byte[] data = zip.readAllBytes();
+            if (e.getName().equals("overlay.json")) {
+                index = JsonParser.parseString(new String(data, StandardCharsets.UTF_8)).getAsJsonObject();
+            } else if (e.getName().startsWith("f/")) {
+                blobs.put(Integer.parseInt(e.getName().substring(2)), data);
+            }
+        }
+        if (index == null || index.get("revision").getAsInt() != LegacyTranslator.REVISION) {
+            throw new IOException("stale or incomplete overlay");
+        }
+        Overlay overlay = new Overlay(index.get("source_format").getAsInt());
+        JsonArray names = index.getAsJsonArray("files");
+        for (int i = 0; i < names.size(); i++) {
+            byte[] data = blobs.get(i);
+            if (data == null) {
+                throw new IOException("overlay is missing " + names.get(i).getAsString());
+            }
+            overlay.files.put(names.get(i).getAsString(), data);
+        }
+        for (Map.Entry<String, JsonElement> a : index.getAsJsonObject("aliases").entrySet()) {
+            overlay.aliases.put(a.getKey(), a.getValue().getAsString());
+        }
+        index.getAsJsonArray("info").forEach(i -> overlay.info.add(i.getAsString()));
+        index.getAsJsonArray("warnings").forEach(w -> overlay.warnings.add(w.getAsString()));
+        return overlay;
     }
 }
