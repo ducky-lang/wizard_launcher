@@ -30,6 +30,7 @@ val helperJars = files(
 val legacyModJar = rootProject.file("legacy-mod/build/libs/wizard-legacy-packs.jar")
 
 val stageResources = tasks.register<Sync>("stageResources") {
+    mustRunAfter(":fetchGameJars")
     from(rootProject.file("resources"))
     from(rootProject.layout.buildDirectory.dir("bundled"))
     from(legacyModJar) { into("mods") }
