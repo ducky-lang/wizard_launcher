@@ -3,13 +3,6 @@ package dev.wizardlauncher.pack
 import java.nio.file.Path
 import kotlin.system.exitProcess
 
-/**
- * Stand-alone use, independent of the launcher:
- * ```
- * java -jar wizard-pack-converter.jar <input pack (.zip or folder)> <output .zip or folder>
- *      [--rules extra-states.json]... [--vanilla-jar 1.20.1.jar]
- * ```
- */
 fun main(args: Array<String>) {
     if (args.size < 2) {
         System.err.println("usage: <input pack> <output pack> [--rules file.json]... [--vanilla-jar client-1.20.1.jar]")

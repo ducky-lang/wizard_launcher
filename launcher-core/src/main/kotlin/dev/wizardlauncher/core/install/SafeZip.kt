@@ -6,18 +6,6 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.zip.ZipFile
 
-/**
- * Zip extraction that cannot be turned against the player.
- *
- * * **Zip Slip:** every entry is resolved and must stay inside the target.
- * * **Zip bombs:** declared sizes and the actual bytes written are both
- *   capped, and the expansion ratio is bounded.
- * * **All or nothing:** extraction goes to a staging folder that replaces
- *   the destination only once complete; an interrupted unpack can never
- *   leave a half-installed world that looks valid next time.
- * * **Wrapper folders:** a zip holding a single top-level folder is
- *   unwrapped, so `World.zip/World/level.dat` lands at `dest/level.dat`.
- */
 object SafeZip {
     private const val MAX_TOTAL = 16L shl 30
     private const val MAX_RATIO = 200

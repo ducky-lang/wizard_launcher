@@ -13,19 +13,6 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
-/**
- * Moves a complete install between computers without internet.
- *
- * Export packs the game (client, libraries, assets, mods), the cached map
- * and resource pack and the install records into one `.wizardpack` zip,
- * with a manifest listing the SHA-256 of every file. Import refuses the
- * bundle unless every file matches its manifest entry and every path stays
- * inside the data folder, then installs it - after which Play works with
- * the network cable unplugged.
- *
- * Deliberately *not* exported: the world save (player progress), settings,
- * and anything in the secret store.
- */
 object OfflineBundle {
     private const val MANIFEST = "wizard-bundle.json"
     private val INCLUDE = listOf("resources/client", "resources/copy", "install_state.json")
@@ -87,7 +74,7 @@ object OfflineBundle {
                 }
                 if (i % 100 == 0) progress.update(i.toDouble() / files.size, "Verifying bundle  ·  $i of ${files.size}")
             }
-            // Everything verified: only now touch the real install.
+
             progress.update(null, "Installing bundle...")
             SafeZip.copyTree(staging, paths.root)
             SafeZip.deleteTree(staging)

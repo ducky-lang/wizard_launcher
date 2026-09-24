@@ -10,11 +10,6 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.CopyOnWriteArrayList
 
-/**
- * One log for the whole launcher. Every line passes through [Redactor]
- * before it reaches the disk or a listener, so a token pasted into an
- * exception message can not end up in a bug report.
- */
 object Log {
     private val listeners = CopyOnWriteArrayList<(String) -> Unit>()
     private var writer: BufferedWriter? = null
@@ -31,14 +26,12 @@ object Log {
 
     fun listen(listener: (String) -> Unit) { listeners += listener }
 
-    /** A user-facing line: shown in the UI and written to the file. */
     fun info(message: String) {
         val clean = Redactor.redact(message)
         file(clean)
         listeners.forEach { runCatching { it(clean) } }
     }
 
-    /** File only - process output, stack traces, diagnostics. */
     @Synchronized
     fun file(message: String) {
         val line = "[${LocalDateTime.now().format(stamp)}] ${Redactor.redact(message)}"
@@ -66,5 +59,4 @@ object Log {
     }
 }
 
-/** Raised for failures the player can act on; the message is shown as-is. */
 class LauncherException(message: String, cause: Throwable? = null) : Exception(message, cause)

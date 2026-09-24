@@ -1,14 +1,5 @@
 name: Build installers
 
-# Tests on every push/PR; installers for all three OSes on a version tag (or
-# by hand). jpackage cannot cross-compile, so each OS builds its own - and
-# each installer carries its own Java 17 runtime, which also runs the game
-# and the world server.
-#
-# Optional repo secret: MC_LAUNCHER_CLIENT_ID (public Azure application id
-# for Microsoft sign-in). Without it the build still works; players then use
-# an offline name.
-
 on:
   push:
     branches: ["**"]

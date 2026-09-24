@@ -1,6 +1,5 @@
 package dev.wizardlauncher.pack
 
-/** What the converter did and what it could not do, in plain words. */
 class ConversionReport {
     val info = ArrayList<String>()
     val warnings = ArrayList<String>()

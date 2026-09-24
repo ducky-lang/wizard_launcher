@@ -87,10 +87,6 @@ class SettingsDialog(owner: JFrame, private val settings: Settings, private val 
     }
 }
 
-/**
- * Device-code sign-in: shows the code, opens Microsoft's page, and waits.
- * The password is typed on Microsoft's site - never here.
- */
 class MicrosoftLoginDialog(owner: JFrame, private val launcher: Launcher, private val onDone: () -> Unit) : JDialog(owner, "Sign in with Microsoft", true) {
     @Volatile private var cancelled = false
     private val code = JLabel("…").apply { font = Font(Font.MONOSPACED, Font.BOLD, 30); foreground = Theme.gold }

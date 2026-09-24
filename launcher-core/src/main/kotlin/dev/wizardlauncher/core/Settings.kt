@@ -4,20 +4,15 @@ import com.google.gson.JsonObject
 import java.lang.management.ManagementFactory
 import java.nio.file.Path
 
-/**
- * User-facing settings, plain JSON (nothing here is secret). Every value is
- * validated on load: the file is user-editable, and values from it end up
- * on JVM command lines.
- */
 class Settings(private val file: Path) {
-    var serverRamMb = 0          // 0 = automatic
-    var clientRamMb = 0          // 0 = automatic
+    var serverRamMb = 0
+    var clientRamMb = 0
     var memoryProfile = MemoryProfile.BALANCED
     var allowLan = false
-    var offlineOnly = false      // never touch the network, even when online
+    var offlineOnly = false
     var autoRestartServer = true
     var convertResourcePack = true
-    var javaPath = ""            // empty = the launcher's own runtime
+    var javaPath = ""
     var closeLauncherOnPlay = false
     var offlineName = ""
     var keepLogDays = 7
@@ -59,11 +54,6 @@ class Settings(private val file: Path) {
 
     val bindAddress get() = if (allowLan) "0.0.0.0" else "127.0.0.1"
 
-    /**
-     * Heap for the world server. One player on a finished adventure map needs
-     * far less than the old fixed 2-4 GB; the heap is also allowed to shrink
-     * back (see JvmFlags), so the ceiling costs nothing until it is used.
-     */
     val effectiveServerRamMb: Int get() = serverRamMb.takeIf { it > 0 } ?: when (memoryProfile) {
         MemoryProfile.LOW -> 768
         MemoryProfile.BALANCED -> if (SystemInfo.totalRamMb <= 8192) 1280 else 1536
@@ -86,7 +76,6 @@ class Settings(private val file: Path) {
         private fun bool(o: JsonObject, key: String, default: Boolean) =
             runCatching { o.get(key).asBoolean }.getOrDefault(default)
 
-        /** Minecraft's own rule for player names. */
         fun validName(name: String) = Regex("^[A-Za-z0-9_]{3,16}$").matches(name)
     }
 }

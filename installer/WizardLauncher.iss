@@ -1,16 +1,3 @@
-; Wizard Launcher - Inno Setup script (Windows installer)
-;
-; Input: the jpackage app-image built by
-;   gradlew :launcher-app:jpackage -PjpackageType=app-image
-; which already contains the Java 17 runtime, the launcher, the helper jars
-; and resources\ (bundled 1.16.5 server + ViaProxy).
-;
-; Version: pass /DMyAppVersion=2.0.0 on the ISCC command line (CI does).
-;
-; Per-user install (no UAC), program under Programs\, player data in
-; {localappdata}\WizardLauncher - kept apart so uninstalling never touches
-; the world unless the player explicitly asks.
-
 #ifndef MyAppVersion
   #define MyAppVersion "2.0.0"
 #endif
@@ -56,7 +43,6 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 Source: "{#ImageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [InstallDelete]
-; 1.x (Python) leftovers in the same program folder.
 Type: filesandordirs; Name: "{app}\_internal"
 
 [Icons]
@@ -68,7 +54,6 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-{ The world, settings and logs are NOT removed on uninstall unless asked. }
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataDir: String;

@@ -1,22 +1,24 @@
 {
   "schema_version": 2,
-  "_comment": "What the launcher installs and how it runs it. A newer catalog can be dropped into the data folder as catalog.json + catalog.json.sig; it is only used if the Ed25519 signature verifies against signing.public_key below.",
-
   "minecraft": {
     "client_version": "1.20.1",
     "server_version": "1.16.5",
     "fabric_loader_fallback": "0.15.11",
     "required_java_major": 17
   },
-
   "server": {
-    "_mode_comment": "hosted = world server and ViaProxy share one JVM (dev.wizardlauncher.host.ServerHost). split = the 1.x layout, two JVMs; kept as a fallback.",
     "mode": "hosted",
     "port": 25565,
     "proxy_port": 25566,
     "entry_name": "Witchcraft and Wizardry",
-    "server_jar": {"path": "servers/1.16.5/server.jar", "sha256": "58f329c7d2696526f948470aa6fd0b45545039b64cb75015e64c12194b373da6"},
-    "proxy_jar":  {"path": "proxy/ViaProxy.jar",        "sha256": "32ce9ad871aeb03286823c29da262ebd75992864e7857db283f103525c7fc0cb"},
+    "server_jar": {
+      "path": "servers/1.16.5/server.jar",
+      "sha256": "58f329c7d2696526f948470aa6fd0b45545039b64cb75015e64c12194b373da6"
+    },
+    "proxy_jar": {
+      "path": "proxy/ViaProxy.jar",
+      "sha256": "32ce9ad871aeb03286823c29da262ebd75992864e7857db283f103525c7fc0cb"
+    },
     "properties": {
       "allow-flight": "true",
       "enable-command-block": "true",
@@ -32,16 +34,22 @@
       "max-players": "4"
     }
   },
-
   "download": {
-    "_comment": "Registrable domains allowed per kind of content. Matched as host == d or host ends with .d, on every redirect hop.",
-    "content_domains": ["huggingface.co", "hf.co"],
-    "game_domains": ["mojang.com", "minecraft.net", "fabricmc.net"],
-    "mod_domains": ["modrinth.com"],
+    "content_domains": [
+      "huggingface.co",
+      "hf.co"
+    ],
+    "game_domains": [
+      "mojang.com",
+      "minecraft.net",
+      "fabricmc.net"
+    ],
+    "mod_domains": [
+      "modrinth.com"
+    ],
     "max_retries": 4,
     "backoff_seconds": 2
   },
-
   "modpack": {
     "id": "fabulously-optimized",
     "name": "Fabulously Optimized",
@@ -58,7 +66,6 @@
       }
     ]
   },
-
   "resources": [
     {
       "id": "map",
@@ -75,13 +82,10 @@
       "url": "https://huggingface.co/datasets/Foxybeo/wz_launcher/resolve/main/Resource%20Pack.zip?download=true",
       "sha256": "",
       "approx_mb": 350,
-      "_convert_comment": "The pack is authored for 1.16.5. convert_from=6 runs it through the 1.16.5 -> 1.20.1 converter (pack-converter) before it is enabled.",
       "convert_from": 6
     }
   ],
-
   "signing": {
-    "_comment": "Base64 X.509 Ed25519 public key. Empty = catalog updates from disk are ignored and only this bundled catalog is used.",
     "public_key": ""
   }
 }

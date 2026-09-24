@@ -49,7 +49,6 @@ fun main(args: Array<String>) {
     SwingUtilities.invokeLater { MainWindow(launcher).isVisible = true }
 }
 
-/** Headless commands. Returns false when the GUI should start. */
 private fun runCli(args: Array<String>): Boolean {
     val progress = Progress { f, m -> println(if (f != null) "[%3d%%] %s".format((f * 100).toInt(), m) else "[....] $m") }
     when (args[0]) {
@@ -78,7 +77,6 @@ private fun runCli(args: Array<String>): Boolean {
             println("\nprivate key (keep secret, never commit):\n" + Base64.getEncoder().encodeToString(kp.private.encoded))
         }
         "--catalog-sign" -> {
-            // --catalog-sign <catalog.json> ; private key from WIZARD_CATALOG_KEY
             val key = System.getenv("WIZARD_CATALOG_KEY") ?: throw LauncherException("Set WIZARD_CATALOG_KEY to the base64 private key.")
             val file = Path.of(args[1])
             val sig = Signature.getInstance("Ed25519").run {
@@ -105,7 +103,6 @@ private val HELP = """
       --catalog-keygen / --catalog-sign <catalog.json>   maintainer tools
 """.trimIndent()
 
-/** One launcher at a time: two would fight over the same world and ports. */
 object SingleInstance {
     private var channel: FileChannel? = null
     private var lock: FileLock? = null

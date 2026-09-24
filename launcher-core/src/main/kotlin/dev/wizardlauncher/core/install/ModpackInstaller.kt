@@ -14,15 +14,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.zip.ZipFile
 
-/**
- * Installs the pinned Modrinth pack (`.mrpack`) into the game folder.
- *
- * The pack archive is pinned by SHA-512 in the catalog and every file inside
- * it by the SHA-512 in its own index, so the set of jars that end up on the
- * player's JVM is fixed by this build - never by what an API says today.
- * Index paths are confined to mods/, config/, resourcepacks/ and
- * shaderpacks/; anything else is refused.
- */
 class ModpackInstaller(
     private val paths: AppPaths,
     private val state: InstallState,
@@ -35,7 +26,6 @@ class ModpackInstaller(
     private fun fingerprint() = InstallState.fingerprint(
         pack.id, pack.version, pack.url, pack.sha512, *pack.extraMods.map { "${it.path}|${it.sha512}" }.toTypedArray())
 
-    /** Offline check: right pack recorded, and every file it installed is still there. */
     fun isInstalled(): Boolean {
         val manifest = Json.read(manifestFile)?.takeIf { it.isJsonObject }?.asJsonObject ?: return false
         if (manifest.get("fingerprint")?.asString != fingerprint()) return false
@@ -43,7 +33,6 @@ class ModpackInstaller(
         return files.all { Files.isRegularFile(paths.gameDir.resolve(it.asString)) }
     }
 
-    /** The Fabric Loader version the pinned pack was built for. */
     fun loaderVersion(): String {
         Json.read(manifestFile)?.asJsonObject?.get("fabric_loader")?.asString?.let { return it }
         return readIndex()?.getAsJsonObject("dependencies")?.get("fabric-loader")?.asString
@@ -61,7 +50,6 @@ class ModpackInstaller(
         }
     }
 
-    /** Downloads the pack archive (needed before [loaderVersion] is known on a first install). */
     fun fetchArchive() {
         if (pack.url.isBlank()) throw LauncherException("No modpack is configured in this build.")
         progress.update(null, "Fetching ${pack.name} ${pack.version}...")
@@ -93,8 +81,7 @@ class ModpackInstaller(
         }
 
         ZipFile(archive().toFile()).use { zip ->
-            // Config defaults: applied on install/upgrade only, so in-game
-            // changes survive ordinary launches.
+
             for (entry in zip.entries().asSequence().filter { !it.isDirectory }) {
                 val prefix = listOf("overrides/", "client-overrides/").firstOrNull { entry.name.startsWith(it) } ?: continue
                 val rel = safeRelative(entry.name.removePrefix(prefix)) ?: continue
@@ -124,11 +111,6 @@ class ModpackInstaller(
         Log.info("${pack.name} ${pack.version} ready - ${installed.size} files.")
     }
 
-    /**
-     * Removes jars a previous install of ours put in mods/ that the new pack
-     * no longer wants (two Sodium versions = instant crash). Jars the player
-     * added themselves were never in our manifest and are left alone.
-     */
     private fun sweep(keep: Set<String>, previous: JsonObject?) {
         val owned = previous?.getAsJsonArray("files")?.map { it.asString }?.toSet() ?: return
         for (rel in owned - keep) {

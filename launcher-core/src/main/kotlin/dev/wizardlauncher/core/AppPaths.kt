@@ -15,7 +15,7 @@ enum class Platform { WINDOWS, MACOS, LINUX;
                 else -> LINUX
             }
         }
-        /** Normalised CPU architecture: x86_64, aarch64 or x86. */
+
         val arch: String by lazy {
             when (val a = System.getProperty("os.arch").lowercase()) {
                 "amd64", "x86_64" -> "x86_64"
@@ -27,13 +27,6 @@ enum class Platform { WINDOWS, MACOS, LINUX;
     }
 }
 
-/**
- * Where everything lives. Same locations the 1.x (Python) launcher used, so
- * an existing install - the 1 GB world with the player's progress in it -
- * is picked up in place instead of being downloaded again.
- *
- * `WIZARD_LAUNCHER_DATA` overrides the root (tests, portable installs).
- */
 class AppPaths(val root: Path) {
     val resources: Path = root.resolve("resources")
     val serverDir: Path get() = resources.resolve("servers").resolve(Catalog.current.minecraft.serverVersion)
@@ -73,7 +66,6 @@ class AppPaths(val root: Path) {
             return AppPaths(root.resolve(APP_DIR))
         }
 
-        /** The read-only folder shipped next to the program (bundled jars). */
         fun bundledResources(): Path? {
             System.getProperty("wizard.resources")?.let { p -> Path.of(p).takeIf(Files::isDirectory)?.let { return it } }
             val code = runCatching { Path.of(AppPaths::class.java.protectionDomain.codeSource.location.toURI()) }.getOrNull()

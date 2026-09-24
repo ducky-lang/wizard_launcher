@@ -12,17 +12,6 @@ import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
-/**
- * Owns the child processes (world server, proxy in split mode, client).
- *
- * Identity is PID **and** start time, recorded in `runtime_state.json`: after
- * a launcher crash the next launcher reaps exactly its own orphans and can
- * never kill an unrelated process that inherited a recycled PID.
- *
- * Stopping escalates: graceful command on stdin (the server saves the world)
- * -> terminate the process tree -> kill it. Each step only if the previous one
- * did not finish in time.
- */
 class ProcessSupervisor(private val stateFile: Path) {
     class Managed(val name: String, val process: Process, val gracefulCommand: String?) {
         val pid = process.pid()
@@ -46,7 +35,6 @@ class ProcessSupervisor(private val stateFile: Path) {
     fun isRunning(name: String) = get(name) != null
     fun anyRunning() = processes.any { it.alive }
 
-    /** Sends one line to a process's stdin (server control channel). */
     fun send(name: String, line: String): Boolean {
         val p = get(name) ?: return false
         return runCatching {
@@ -98,7 +86,6 @@ class ProcessSupervisor(private val stateFile: Path) {
         }, "pipe-$label").apply { isDaemon = true }.start()
     }
 
-    // ------------------------------------------------------------------ crash recovery
     private fun save() {
         val list = JsonArray()
         processes.filter { it.alive }.forEach { p ->
@@ -116,7 +103,6 @@ class ProcessSupervisor(private val stateFile: Path) {
         }
     }
 
-    /** Stops leftovers from a launcher that died without cleaning up. */
     fun reapOrphans(): Int {
         val state = Json.read(stateFile)?.takeIf { it.isJsonObject }?.asJsonObject ?: return 0
         if (state.get("launcher_pid")?.asLong == ProcessHandle.current().pid()) return 0
@@ -126,8 +112,7 @@ class ProcessSupervisor(private val stateFile: Path) {
         for (e in state.getAsJsonArray("processes") ?: JsonArray()) {
             val o = e.asJsonObject
             val name = o.get("name").asString
-            // A server still watching a running game is not an orphan: the
-            // player closed the launcher mid-game on purpose.
+
             if (name == "client") continue
             val handle = ProcessHandle.of(o.get("pid").asLong).orElse(null) ?: continue
             val recorded = o.get("started")?.asLong ?: 0

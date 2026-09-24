@@ -5,12 +5,6 @@ import dev.wizardlauncher.core.Json
 import dev.wizardlauncher.core.security.Hashes
 import java.nio.file.Path
 
-/**
- * Records what has been installed, keyed by a fingerprint of *what was
- * asked for* (versions, URLs, hashes). A launch whose fingerprints all match
- * does no network I/O and no re-hashing at all - which is both why a warm
- * start is fast and why it works with the Wi-Fi off.
- */
 class InstallState(private val file: Path) {
     private val data: JsonObject = Json.read(file)?.takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
 

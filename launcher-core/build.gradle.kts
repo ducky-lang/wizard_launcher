@@ -13,7 +13,7 @@ dependencies { implementation(project(":pack-converter")) }
 tasks.processResources {
     val props = mapOf(
         "version" to project.version.toString(),
-        // Public Azure client id, injected at build time (see BuildInfo).
+
         "microsoftClientId" to (System.getenv("MC_LAUNCHER_CLIENT_ID") ?: findProperty("msClientId")?.toString() ?: ""),
     )
     inputs.properties(props)

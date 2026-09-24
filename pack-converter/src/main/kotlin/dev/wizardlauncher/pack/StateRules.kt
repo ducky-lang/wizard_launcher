@@ -5,35 +5,6 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 
-/**
- * Declarative rules for moving a pack between game versions - and for
- * *defining block states* the pack wants to exist.
- *
- * Rules come from three places, applied in order, later ones winning:
- *  1. the built-in 1.16.5 -> 1.20.1 table shipped with the converter;
- *  2. `wizard-states.json` at the root of the pack itself;
- *  3. any extra files passed on the command line / from the launcher's data folder.
- *
- * The format, all sections optional:
- * ```
- * {
- *   "format": 1,
- *   "copy_files":        [{"from": "assets/...", "to": "assets/..."}],
- *   "rename_references": {"models": {"ns:old": "ns:new"}, "textures": {...}},
- *   "split_blockstates": [{"from": "minecraft:cauldron", "when": {"level": "1|2|3"},
- *                          "to": "minecraft:water_cauldron", "remove_properties": [], "set": {}}],
- *   "lang_keys":         {"old.key": "new.key"},
- *   "states": {                      // define / override block states -> models
- *     "minecraft:note_block": {
- *       "instrument=harp,note=1,powered=false": {"model": "wizard:block/crystal_ball"}
- *     }
- *   },
- *   "items": {                       // custom_model_data (or any predicate) -> model
- *     "minecraft:stick": [{"predicate": {"custom_model_data": 1001}, "model": "wizard:item/wand"}]
- *   }
- * }
- * ```
- */
 data class StateRules(
     val copyFiles: List<Pair<String, String>> = emptyList(),
     val modelRenames: Map<String, String> = emptyMap(),
@@ -68,7 +39,6 @@ data class StateRules(
             return parse(stream.use { it.readBytes().toString(Charsets.UTF_8) }, "built-in")
         }
 
-        /** Parses a rules file. Malformed entries throw with a precise message. */
         fun parse(text: String, origin: String): StateRules {
             val root = try {
                 JsonParser.parseString(text).asJsonObject
@@ -97,7 +67,7 @@ data class StateRules(
             val states = (root.getAsJsonObject("states") ?: JsonObject()).entrySet().associate { (block, variants) ->
                 require(variants.isJsonObject) { "$origin: states.$block must be an object of variant -> model" }
                 id(block) to variants.asJsonObject.entrySet().associate { (key, model) ->
-                    VariantKey.parse(key) // validates syntax early
+                    VariantKey.parse(key)
                     key to model
                 }
             }
@@ -131,12 +101,10 @@ data class StateRules(
             return path
         }
 
-        /** Normalises `stone` to `minecraft:stone`. */
         fun id(raw: String): String = if (':' in raw) raw else "minecraft:$raw"
     }
 }
 
-/** A blockstate variant key such as `facing=north,half=top`, order-insensitive. */
 data class VariantKey(val properties: Map<String, String>) {
     override fun toString() = properties.entries.sortedBy { it.key }.joinToString(",") { "${it.key}=${it.value}" }
 

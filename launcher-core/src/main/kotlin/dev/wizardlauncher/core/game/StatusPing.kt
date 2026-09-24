@@ -8,10 +8,6 @@ import java.io.DataOutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 
-/**
- * Minecraft server-list ping. Used by the world self-test to prove that a
- * 1.20.1 client (protocol 763) gets a real answer through the bridge.
- */
 object StatusPing {
     const val PROTOCOL_1_20_1 = 763
 

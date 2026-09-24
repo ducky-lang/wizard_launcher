@@ -11,11 +11,6 @@ import dev.wizardlauncher.pack.VanillaAssets
 import java.nio.file.Files
 import java.nio.file.Path
 
-/**
- * The map and the resource pack: downloaded once into a cache, then
- * installed from it. The world is copied (never moved) so "reset world"
- * restores it from the cache without another gigabyte over the wire.
- */
 class ContentInstaller(
     private val paths: AppPaths,
     private val state: InstallState,
@@ -39,7 +34,6 @@ class ContentInstaller(
         Log.info("Castle installed.")
     }
 
-    /** Download + unpack a catalog resource into the content cache. */
     private fun fetch(resource: Catalog.Resource): Path {
         val dir = paths.contentCache.resolve(resource.name)
         if (Files.isDirectory(dir) && Files.list(dir).use { it.findAny().isPresent }) return dir
@@ -50,8 +44,6 @@ class ContentInstaller(
                 "${resource.name}  ·  ${formatBytes(done)}${if (total > 0) " of ${formatBytes(total)}" else ""}")
         }
         if (resource.sha256.isBlank()) {
-            // No digest published yet: record what we got, so the maintainer
-            // can pin it and so a later re-download that differs is noticed.
             Log.file("${resource.name}: downloaded sha256=$sha256 (no pin in catalog)")
         }
         SafeZip.extract(zip, dir, progress, resource.name)
@@ -59,11 +51,6 @@ class ContentInstaller(
         return dir
     }
 
-    /**
-     * Installs the resource pack into the game, converted for 1.20.1 when the
-     * catalog says it was authored for an older format. Returns the folder or
-     * zip name to enable in options.txt.
-     */
     fun ensureResourcePack(convert: Boolean): String {
         val resource = catalog.resource("resource_pack")
         val needsConversion = convert && resource.convertFrom != null && resource.convertFrom < PackConverter.TARGET_FORMAT
@@ -94,7 +81,6 @@ class ContentInstaller(
     }
 
     companion object {
-        /** Bump when the converter changes output, so installed packs are re-converted. */
         const val CONVERTER_REVISION = 1
 
         fun requireSpace(paths: AppPaths, mb: Int) {

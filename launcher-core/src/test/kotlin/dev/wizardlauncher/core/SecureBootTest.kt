@@ -8,7 +8,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Stand-in for the game's main class: reports what it received and what the OS shows. */
 object FakeGameMain {
     @JvmStatic fun main(args: Array<String>) {
         println("ARGS=" + args.joinToString("|"))

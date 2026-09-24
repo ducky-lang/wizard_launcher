@@ -3,11 +3,6 @@ package dev.wizardlauncher.core.net
 import java.net.InetSocketAddress
 import java.net.Socket
 
-/**
- * A quick "is there internet?" answer, used only to *skip* optional network
- * work (token refresh) when offline - never to decide whether the game may
- * start. Playing never needs the network once installed.
- */
 object Connectivity {
     @Volatile private var cached: Pair<Long, Boolean>? = null
 

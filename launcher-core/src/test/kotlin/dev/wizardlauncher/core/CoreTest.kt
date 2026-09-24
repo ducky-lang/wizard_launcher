@@ -86,7 +86,6 @@ class CoreTest {
     }
 
     @Test fun `offline uuid matches the server's derivation`() {
-        // UUID.nameUUIDFromBytes("OfflinePlayer:Notch"), as a 1.16.5 server computes it.
         assertEquals("b50ad385-829d-3141-a216-7e7d7539ba7f", OfflineUuid.of("Notch").toString())
     }
 
@@ -152,7 +151,6 @@ class CoreTest {
         OfflineBundle.import(dst, bundle)
         assertEquals("jar", Files.readString(dst.root.resolve("resources/client/1.20.1/minecraft/libraries/x.jar")))
 
-        // Same manifest, different bytes: must be refused, nothing installed.
         val tampered = tmp.resolve("t.wizardpack")
         java.util.zip.ZipFile(bundle.toFile()).use { zin ->
             ZipOutputStream(Files.newOutputStream(tampered)).use { zout ->

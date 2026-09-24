@@ -14,11 +14,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Base64
 
-/**
- * Builds the client command from the installed version JSON and starts it
- * through the SecureBoot shim, so the access token travels over a pipe and
- * never appears on the process command line (see client-boot).
- */
 class ClientRunner(
     private val paths: AppPaths,
     private val settings: Settings,
@@ -60,7 +55,7 @@ class ClientRunner(
         command += JvmFlags.client(settings.effectiveClientRamMb)
         command += jvm
         command += "dev.wizardlauncher.boot.SecureBoot"
-        // The visible command line: JVM flags and the classpath. No token.
+
         Log.file("Client command: " + command.joinToString(" ") { if (it.length > 300) it.take(80) + "...(${it.length} chars)" else it })
 
         val output = paths.logs.resolve("client-output.log").toFile()
@@ -91,8 +86,7 @@ class ClientRunner(
             val value = o.get("value")
             if (value.isJsonArray) value.asJsonArray.forEach { out += sub(it.asString) } else out += sub(value.asString)
         }
-        // A leftover ${...} means an argument this launcher does not supply
-        // (a feature we did not enable); drop the flag together with it.
+
         val cleaned = ArrayList<String>()
         var i = 0
         while (i < out.size) {

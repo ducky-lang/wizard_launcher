@@ -6,16 +6,6 @@ import dev.wizardlauncher.core.security.Signatures
 import java.nio.file.Files
 import java.nio.file.Path
 
-/**
- * What the launcher installs and how it runs it, parsed from `catalog.json`.
- *
- * The bundled catalog is the default. A newer one may be placed in the data
- * folder with a detached Ed25519 signature (`catalog.json.sig`); it replaces
- * the bundled one only if the signature verifies against the key *in the
- * bundled catalog*. A catalog is the list of URLs and hashes the launcher
- * trusts, so an unsigned edit to it must never be able to redirect a
- * download.
- */
 class Catalog private constructor(root: JsonObject) {
     data class Minecraft(val clientVersion: String, val serverVersion: String, val fabricLoaderFallback: String, val requiredJava: Int)
     data class PinnedFile(val path: String, val sha256: String)
@@ -86,7 +76,6 @@ class Catalog private constructor(root: JsonObject) {
         private fun bundledText(): String =
             Catalog::class.java.getResourceAsStream("catalog.json")!!.use { it.readBytes().toString(Charsets.UTF_8) }
 
-        /** Adopts `<dataRoot>/catalog.json` if it is correctly signed. */
         fun load(dataRoot: Path): Catalog {
             val base = bundled()
             val file = dataRoot.resolve("catalog.json")

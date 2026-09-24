@@ -14,20 +14,6 @@ import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * Where the Microsoft refresh token lives. Never in plain text:
- *
- * | OS      | Primary                                 | Fallback                   |
- * |---------|-----------------------------------------|----------------------------|
- * | Windows | DPAPI (bound to the Windows user)       | -                          |
- * | macOS   | Keychain via `security`                 | AES-GCM file               |
- * | Linux   | Secret Service via `secret-tool`        | AES-GCM file               |
- *
- * The AES-GCM fallback keeps its key in a separate owner-only (0600) file.
- * That protects against the token being read out of a copied data folder or
- * a backup, not against malware running as the same user - which no
- * user-space store can.
- */
 class SecretStore(private val dir: Path) {
     private val service = "WizardLauncher"
 
@@ -61,21 +47,17 @@ class SecretStore(private val dir: Path) {
         }
     }
 
-    // --- Windows ---------------------------------------------------------
     private fun dpapiProtect(data: ByteArray): ByteArray = Crypt32Util.cryptProtectData(data)
     private fun dpapiUnprotect(data: ByteArray): ByteArray = Crypt32Util.cryptUnprotectData(data)
 
-    // --- macOS -----------------------------------------------------------
     private fun keychainPut(name: String, value: String): Boolean =
-        // -U updates in place. The secret goes through argv briefly; `security`
-        // has no stdin mode for add-generic-password.
+
         run("security", "add-generic-password", "-U", "-s", service, "-a", name, "-w", value)?.first == 0
 
     private fun keychainGet(name: String): String? =
         run("security", "find-generic-password", "-s", service, "-a", name, "-w")
             ?.takeIf { it.first == 0 }?.second?.trim()?.takeIf { it.isNotEmpty() }
 
-    // --- Linux -----------------------------------------------------------
     private fun secretToolPut(name: String, value: String): Boolean =
         run("secret-tool", "store", "--label=Wizard Launcher", "service", service, "account", name, stdin = value)?.first == 0
 
@@ -91,7 +73,6 @@ class SecretStore(private val dir: Path) {
         p.exitValue() to text
     }.getOrNull()
 
-    // --- AES-GCM file fallback -------------------------------------------
     private fun key(): ByteArray {
         val keyFile = dir.resolve(".key")
         if (Files.exists(keyFile)) return Base64.getDecoder().decode(Files.readString(keyFile).trim())
@@ -113,7 +94,6 @@ class SecretStore(private val dir: Path) {
         return cipher.doFinal(blob, 12, blob.size - 12)
     }
 
-    // --- files -----------------------------------------------------------
     private fun file(name: String) = dir.resolve("$name.bin")
     private fun readFile(name: String): ByteArray? = file(name).takeIf(Files::exists)?.let(Files::readAllBytes)
     private fun writeFile(name: String, data: ByteArray) = writeAtomic(file(name), data)

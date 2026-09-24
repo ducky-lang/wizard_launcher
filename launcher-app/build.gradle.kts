@@ -22,8 +22,6 @@ tasks.jar {
 evaluationDependsOn(":server-host")
 evaluationDependsOn(":client-boot")
 
-// The two helper jars live next to the launcher jar (lib/ in the
-// distribution, app/ in a jpackage image): Launcher.tool() looks there.
 val helperJars = files(
     project(":server-host").tasks.named("jar"),
     project(":client-boot").tasks.named("jar"),
@@ -33,8 +31,7 @@ distributions {
     main {
         contents {
             into("lib") { from(helperJars) }
-            // The bundled 1.16.5 server and ViaProxy, copied into the data
-            // folder on first start (dev.wizardlauncher.core.Bootstrap).
+
             into("resources") {
                 from(rootProject.file("resources"))
             }
@@ -51,12 +48,6 @@ tasks.named<JavaExec>("run") {
     }
 }
 
-/**
- * Native installer / app image via the JDK's jpackage. Run on each OS:
- *   ./gradlew :launcher-app:jpackage -PjpackageType=app-image|dmg|deb|msi
- * The image carries its own Java runtime, which also runs the game and the
- * world server - nothing Java-related is ever downloaded.
- */
 tasks.register<Exec>("jpackage") {
     group = "distribution"
     dependsOn("installDist", ":makeIcons")
@@ -84,7 +75,7 @@ tasks.register<Exec>("jpackage") {
         "--main-jar", "wizard-launcher.jar",
         "--main-class", "dev.wizardlauncher.app.MainKt",
         "--dest", out.absolutePath,
-        // Everything Minecraft 1.20.1, the 1.16.5 server and ViaProxy use.
+
         "--add-modules", "java.se,jdk.unsupported,jdk.crypto.ec,jdk.zipfs,jdk.management,jdk.charsets,jdk.localedata,jdk.net,jdk.naming.dns,jdk.accessibility,jdk.httpserver,jdk.jfr",
         "--jlink-options", "--strip-debug --no-man-pages --no-header-files",
         "--java-options", "-Xmx512m -XX:+UseSerialGC",

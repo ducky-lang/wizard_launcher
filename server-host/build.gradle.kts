@@ -1,7 +1,5 @@
 plugins { java }
 
-// Dependency-free: it shares a JVM with the vanilla server and ViaProxy, and
-// every class it brought along would be one more thing to collide with theirs.
 tasks.jar {
     archiveFileName.set("wizard-server-host.jar")
     manifest {

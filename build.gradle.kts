@@ -4,9 +4,6 @@ plugins {
     kotlin("jvm") version "2.0.21" apply false
 }
 
-// Everything targets Java 17: it is the runtime Minecraft 1.20.1 needs, so
-// one bundled JRE runs the launcher, the client and the world server alike -
-// nothing has to be downloaded to play.
 subprojects {
     group = "dev.wizardlauncher"
     version = property("launcherVersion") as String
@@ -29,11 +26,6 @@ subprojects {
     }
 }
 
-/**
- * installer/app.ico, installer/app.icns and installer/linux/app.png from
- * assets/floo-logo.png. Both ICO (Vista+) and ICNS ('ic08'/'ic09') may embed
- * PNG data directly, so no image library is needed - only ImageIO.
- */
 tasks.register("makeIcons") {
     group = "distribution"
     val source = file("assets/floo-logo.png")

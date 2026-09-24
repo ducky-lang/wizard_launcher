@@ -6,12 +6,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
-/**
- * `servers.dat` - the multiplayer list - is uncompressed NBT: a root compound
- * holding a list "servers" of compounds with "name" and "ip". Only those two
- * fields (plus "hidden"/"acceptTextures" bytes) are kept; anything else in
- * an entry, such as a cached icon, is rebuilt by the game.
- */
 object ServersDat {
     data class Entry(val name: String, val ip: String, val acceptTextures: Byte? = null)
 
@@ -31,7 +25,6 @@ object ServersDat {
         }.getOrDefault(emptyList())
     }
 
-    /** Puts our entry first, replacing any previous one with the same name. */
     fun upsert(file: Path, name: String, ip: String) {
         val entries = listOf(Entry(name, ip, 1)) + read(file).filter { it.name != name && it.ip != ip }
         Files.createDirectories(file.parent)
@@ -76,7 +69,6 @@ object ServersDat {
     }
 }
 
-/** Minimal `options.txt` editing: only the resource pack lists are touched. */
 object GameOptions {
     fun enableResourcePack(optionsFile: Path, packName: String, compatible: Boolean, stale: Collection<String>) {
         val lines = if (Files.isRegularFile(optionsFile)) Files.readAllLines(optionsFile).toMutableList() else mutableListOf()

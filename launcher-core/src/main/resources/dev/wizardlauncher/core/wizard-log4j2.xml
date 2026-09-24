@@ -1,10 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Logging for the 1.16.5 world server. The server bundles Log4j 2.8.1, which is
-  vulnerable to CVE-2021-44228 ("Log4Shell"), and on that version the usual
-  -Dlog4j2.formatMsgNoLookups=true flag does nothing (it arrived in 2.10).
-  %msg{nolookups} is the fix Mojang itself shipped for 1.12-1.16.5.
--->
 <Configuration status="WARN" packages="com.mojang.util">
     <Appenders>
         <Console name="SysOut" target="SYSTEM_OUT">

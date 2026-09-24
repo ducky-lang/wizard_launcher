@@ -19,24 +19,8 @@ import java.time.Duration
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLParameters
 
-/** Progress callback: bytes done, bytes total (-1 unknown). */
 typealias ByteProgress = (Long, Long) -> Unit
 
-/**
- * The only way the launcher fetches anything from the network.
- *
- * * **HTTPS only, TLS 1.2+.** Plain http is refused before a socket opens.
- * * **Host allow-list, checked on every hop.** Redirects are followed by hand
- *   (the client is built with `Redirect.NEVER`) so each Location is checked
- *   against the allow-list *before* it is requested - a compromised mirror
- *   cannot bounce a download to an attacker's host.
- * * **Verified before it exists.** Data streams into `<file>.part` while being
- *   hashed; only a matching digest is moved into place, atomically. A file
- *   whose hash is wrong is never visible under its real name.
- * * **Bounded.** A size cap stops a hostile or broken server from filling the
- *   disk; transient failures retry with exponential backoff; large downloads
- *   resume with HTTP Range after a dropped connection.
- */
 class SecureDownloader(
     private val allowedDomains: Set<String>,
     private val maxRetries: Int = 4,
@@ -63,7 +47,6 @@ class SecureDownloader(
                 "Try another network, or turn off 'HTTPS scanning' in your antivirus.")
     }
 
-    /** Small documents (JSON manifests). */
     fun fetchBytes(url: String, expected: Checksum? = null, maxBytes: Long = 16L shl 20): ByteArray {
         val tmp = Files.createTempFile("wizard", ".dl")
         try {
@@ -76,11 +59,6 @@ class SecureDownloader(
 
     fun fetchText(url: String, expected: Checksum? = null) = fetchBytes(url, expected).toString(Charsets.UTF_8)
 
-    /**
-     * Downloads [url] to [target]. Skips the network entirely when [target]
-     * already exists and matches [expected]. Returns the SHA-256 of the file
-     * (useful for trust-on-first-use pins when no digest was published).
-     */
     fun download(
         url: String,
         target: Path,
@@ -142,8 +120,6 @@ class SecureDownloader(
                 return@repeat
             }
             if (status == 416 && already > 0) {
-                // Server says the range is past the end: the part file is either
-                // complete or stale. Start over rather than guess.
                 response.body().close()
                 Files.deleteIfExists(part)
                 already = 0

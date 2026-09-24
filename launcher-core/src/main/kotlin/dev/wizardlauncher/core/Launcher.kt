@@ -23,13 +23,6 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.locks.ReentrantLock
 
-/**
- * The launcher's one entry point for the UI and the CLI.
- *
- * Play is offline-first: every install step first asks its local record
- * "is this already done?" and only goes to the network when the answer is
- * no. On a machine that has played once, a launch performs no network I/O.
- */
 class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
     val settings = Settings(paths.root.resolve("settings.json")).load()
     val state = InstallState(paths.root.resolve("install_state.json"))
@@ -50,7 +43,6 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         SecureDownloader(domains, it.maxRetries, it.backoffMs)
     }
 
-    /** True when nothing needs the network before the game can start. */
     fun readyOffline(): Boolean {
         val modpack = ModpackInstaller(paths, state, downloader(Catalog.current.download.mods), Progress.NONE)
         return modpack.isInstalled() &&
@@ -58,10 +50,6 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             ContentInstaller(paths, state, downloader(Catalog.current.download.content), Progress.NONE).isWorldInstalled()
     }
 
-    /**
-     * Install whatever is missing, start the world, start the game.
-     * Returns the client process; the world stops by itself when it exits.
-     */
     fun play(account: Account, progress: Progress): Process {
         if (!playLock.tryLock()) throw LauncherException("A launch is already in progress.")
         try {
@@ -120,12 +108,6 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         }
     }
 
-    /**
-     * Starts only the world and the bridge, pings it the way a 1.20.1 client
-     * would, reports memory use and stops it again (saving). Needs no
-     * internet and no game install: a quick way to check the world server
-     * on a new machine.
-     */
     fun selfTestWorld(progress: Progress, playerName: String = "WizardTest"): String {
         if (supervisor.anyRunning()) throw LauncherException("Stop the game first.")
         val java = JavaLocator.find(settings, Catalog.current.minecraft.requiredJava)
@@ -173,7 +155,6 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         server?.stop(report) ?: supervisor.stopAll(report)
     }
 
-    /** Copies the world aside before anything destructive. */
     fun backupWorld(): Path? {
         if (!Files.isDirectory(paths.worldDir)) return null
         val target = paths.backups.resolve("world-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")))
@@ -188,7 +169,6 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         ContentInstaller(paths, state, downloader(Catalog.current.download.content), progress).ensureWorld(force = true)
     }
 
-    /** The helper jars shipped with the launcher (server host, client boot). */
     fun tool(name: String): Path {
         val candidates = listOfNotNull(
             System.getProperty("wizard.tools")?.let { Path.of(it, name) },
@@ -200,7 +180,6 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
     }
 }
 
-/** First-run copy of the jars shipped with the installer into the data folder. */
 object Bootstrap {
     fun copyBundledResources(paths: AppPaths) {
         val bundled = AppPaths.bundledResources() ?: return
@@ -208,9 +187,7 @@ object Bootstrap {
             Files.walk(bundled).use { stream ->
                 stream.filter(Files::isRegularFile).forEach { src ->
                     val dst = paths.resources.resolve(bundled.relativize(src).toString())
-                    // Only missing files, and jars that differ from the shipped
-                    // ones (an update ships a new server/ViaProxy). A world or a
-                    // server.properties already in the data folder is never replaced.
+
                     val replace = !Files.exists(dst) ||
                         (src.fileName.toString().endsWith(".jar") && Files.size(src) != Files.size(dst))
                     if (replace) {

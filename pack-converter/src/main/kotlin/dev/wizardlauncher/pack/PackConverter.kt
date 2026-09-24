@@ -11,28 +11,6 @@ import java.io.StringReader
 import java.nio.file.Files
 import java.nio.file.Path
 
-/**
- * Converts a Minecraft 1.16.5 resource pack (pack_format 6) so that 1.20.1
- * (pack_format 15) loads and renders it the way 1.16.5 did.
- *
- * What 1.16.5 -> 1.20.1 broke, and what is done about each:
- *
- *  | Change in the game                                    | Fix                                        |
- *  |-------------------------------------------------------|--------------------------------------------|
- *  | 1.19.3 texture atlases: only `block/` and `item/`     | generate `atlases/blocks.json` listing     |
- *  |   textures are stitched for models any more           |   every other texture a model uses         |
- *  | 1.17 grass_path -> dirt_path, squid, cauldron split,  | copy files / rewrite references /          |
- *  |   1.19.4 split enchantment glint                      |   split blockstates (see [StateRules])     |
- *  | 1.20 removed the `legacy_unicode` font provider       | [FontConverter]: bitmap pages + spaces     |
- *  | 1.17 post shaders need GLSL 150 core                  | [ShaderUpgrader]                           |
- *  | pack_format 6 is flagged "incompatible"               | pack.mcmeta rewritten to 15                |
- *
- * On top of the version table, a pack (or the launcher) can *define block
- * states and item models* declaratively - see [StateRules].
- *
- * Everything the converter could not translate ends up in
- * `wizard-conversion-report.txt` inside the output pack.
- */
 class PackConverter(
     private val vanilla: VanillaAssets? = null,
     private val log: (String) -> Unit = {},
@@ -76,9 +54,8 @@ class PackConverter(
         val rules: StateRules,
         val report: ConversionReport,
     ) {
-        /** output path -> source path (identity, plus the aliases copy rules add). */
         val files = LinkedHashMap<String, String>()
-        /** JSON documents that were changed or created, by output path. */
+
         val json = LinkedHashMap<String, JsonElement>()
         val bytes = LinkedHashMap<String, ByteArray>()
 
@@ -95,7 +72,6 @@ class PackConverter(
 
         fun providedByPack(path: String) = path in files || path in json || path in bytes
 
-        // ------------------------------------------------------------ copies
         fun applyCopies() {
             for ((from, to) in rules.copyFiles) {
                 if (from in files && to !in files) {
@@ -105,7 +81,6 @@ class PackConverter(
             }
         }
 
-        // ------------------------------------------------------------ per-file rewrites
         fun rewrite(path: String) {
             val lower = path.lowercase()
             when {
@@ -131,8 +106,6 @@ class PackConverter(
             json[path]?.let { return it }
             val text = source.read(files.getValue(path)).toString(Charsets.UTF_8).removePrefix("﻿")
             return try {
-                // 1.16's loader tolerated comments and trailing commas in
-                // many places; parse leniently so they are normalised away.
                 JsonParser.parseReader(JsonReader(StringReader(text)).apply { setStrictness(Strictness.LENIENT) })
             } catch (e: Exception) {
                 report.warn("$path: invalid JSON, copied unchanged (${e.message?.take(120)})")
@@ -140,7 +113,6 @@ class PackConverter(
             }
         }
 
-        /** Runs [edit] on a parsed copy; keeps it only if [edit] reports a change. */
         fun editJson(path: String, edit: (JsonElement) -> Boolean) {
             val root = readJson(path) ?: return
             if (edit(root)) json[path] = root
@@ -232,7 +204,6 @@ class PackConverter(
             }
         }
 
-        // ------------------------------------------------------------ blockstate splits
         fun applySplits() {
             for ((from, splits) in rules.splits.groupBy { it.from }) {
                 val fromPath = Res.blockstateFile(from)
@@ -273,7 +244,6 @@ class PackConverter(
             }
         }
 
-        // ------------------------------------------------------------ user-defined states
         fun applyDefinedStates() {
             for ((block, defined) in rules.states) {
                 val path = Res.blockstateFile(block)
@@ -311,8 +281,7 @@ class PackConverter(
                     }
                 val list = model.getAsJsonArray("overrides") ?: JsonArray()
                 overrides.forEach { list.add(it.deepCopy()) }
-                // Minecraft picks the LAST matching override, so ascending
-                // custom_model_data order is what makes each value select its own model.
+
                 val sorted = list.map { it.asJsonObject }.sortedBy {
                     it.getAsJsonObject("predicate")?.get("custom_model_data")?.asDouble ?: 0.0
                 }
@@ -323,7 +292,6 @@ class PackConverter(
             }
         }
 
-        // ------------------------------------------------------------ atlas
         fun generateAtlas() {
             val referenced = sortedSetOf<String>()
             val modelPaths = (files.keys + json.keys).filter { Regex("^assets/[^/]+/models/.+\\.json$").matches(it) }.toSet()
@@ -339,7 +307,7 @@ class PackConverter(
                 val (_, texturePath) = Res.split(id)
                 val top = texturePath.substringBefore('/', "")
                 when {
-                    top == "block" || top == "item" -> Unit // stitched by default
+                    top == "block" || top == "item" -> Unit
                     top.isEmpty() || top in VANILLA_TEXTURE_ROOTS -> singles += id
                     else -> directories += top
                 }
@@ -366,7 +334,6 @@ class PackConverter(
                 "(1.19.3+ no longer stitches textures outside block/ and item/)")
         }
 
-        // ------------------------------------------------------------ output
         fun write() {
             val all = LinkedHashSet<String>().apply { addAll(files.keys); addAll(json.keys); addAll(bytes.keys) }
             for (path in all) {
@@ -385,7 +352,6 @@ class PackConverter(
         const val PACK_RULES = "wizard-states.json"
         const val REPORT = "wizard-conversion-report.txt"
 
-        /** Texture folders vanilla keeps outside the block atlas. Referenced files there get single entries. */
         val VANILLA_TEXTURE_ROOTS = setOf(
             "entity", "misc", "environment", "gui", "font", "painting", "mob_effect", "particle",
             "map", "models", "colormap", "effect", "trims",

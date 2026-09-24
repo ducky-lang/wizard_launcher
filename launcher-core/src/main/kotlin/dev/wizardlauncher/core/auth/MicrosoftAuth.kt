@@ -12,12 +12,6 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import javax.net.ssl.SSLParameters
 
-/**
- * Microsoft -> Xbox Live -> XSTS -> Minecraft sign-in, using the OAuth 2.0
- * *device code* flow: the player types a code on Microsoft's own page, so
- * the launcher never sees, handles or stores a password. Only the refresh
- * token is kept (in [dev.wizardlauncher.core.security.SecretStore]).
- */
 class MicrosoftAuth(private val clientId: String = BuildInfo.microsoftClientId) {
     data class DeviceCode(val userCode: String, val verificationUri: String, val deviceCode: String, val interval: Int, val expiresIn: Int)
     data class Session(val name: String, val uuid: String, val accessToken: String, val refreshToken: String, val xuid: String, val expiresAt: Long)
@@ -36,7 +30,6 @@ class MicrosoftAuth(private val clientId: String = BuildInfo.microsoftClientId) 
         return DeviceCode(o.s("user_code"), o.s("verification_uri"), o.s("device_code"), o.get("interval")?.asInt ?: 5, o.get("expires_in")?.asInt ?: 900)
     }
 
-    /** Blocks until the player finished on Microsoft's page, [cancelled] returns true, or the code expires. */
     fun awaitDeviceLogin(code: DeviceCode, cancelled: () -> Boolean): Session {
         var interval = code.interval
         val deadline = System.currentTimeMillis() + code.expiresIn * 1000L
@@ -90,7 +83,6 @@ class MicrosoftAuth(private val clientId: String = BuildInfo.microsoftClientId) 
             System.currentTimeMillis() + (mc.get("expires_in")?.asLong ?: 86400) * 1000)
     }
 
-    // ------------------------------------------------------------------ http
     private fun requireConfigured() {
         if (!configured) throw LauncherException("Microsoft sign-in is not configured in this build. Use an offline name instead.")
     }

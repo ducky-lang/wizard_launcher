@@ -6,22 +6,6 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
-/**
- * Replaces the `legacy_unicode` font provider, which 1.20 removed.
- *
- * In 1.16 a pack could override `font/unicode_page_XX.png` and every
- * character on that page rendered from the pack's image - the standard trick
- * for custom GUI art, icons and "negative space" in adventure maps. On 1.20
- * those images are simply ignored and the text falls back to Unifont.
- *
- * Each overridden page is turned into an equivalent `bitmap` provider:
- *  - glyphs are cropped to the column range `glyph_sizes.bin` gives them,
- *    exactly as the legacy renderer did, into a regenerated page texture;
- *  - cells that are empty but have a size become `space` advances, so
- *    spacing characters keep their width;
- *  - cells with no size stay undefined and fall through to the default font,
- *    as they did before.
- */
 internal class FontConverter(
     private val source: PackSource,
     private val report: ConversionReport,
@@ -78,7 +62,7 @@ internal class FontConverter(
                     val blank = copyGlyph(image, cropped, col * cell, row * cell, cell,
                         (start * scale).toInt(), ((end + 1) * scale).toInt())
                     when {
-                        size == 0 -> line.append('\u0000') // undefined: fall through, as before
+                        size == 0 -> line.append('\u0000')
                         blank && size > 0 -> {
                             line.append('\u0000')
                             spaces.addProperty(String(Character.toChars(codepoint)), (end - start + 1) / 2 + 1)
@@ -110,7 +94,6 @@ internal class FontConverter(
         return result
     }
 
-    /** Copies columns [from, to) of one cell to the cell's left edge. Returns true if it was empty. */
     private fun copyGlyph(src: BufferedImage, dst: BufferedImage, x0: Int, y0: Int, cell: Int, from: Int, to: Int): Boolean {
         var blank = true
         for (y in 0 until cell) for (x in from until minOf(to, cell)) {

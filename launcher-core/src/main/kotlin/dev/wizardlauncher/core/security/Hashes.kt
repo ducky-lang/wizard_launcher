@@ -23,12 +23,10 @@ object Hashes {
 
     fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
 
-    /** Constant-time comparison of two hex digests. */
     fun matches(actual: String, expected: String): Boolean =
         MessageDigest.isEqual(actual.lowercase().toByteArray(), expected.lowercase().toByteArray())
 }
 
-/** An expected digest: `sha1`, `sha256` or `sha512`. */
 data class Checksum(val algorithm: String, val hex: String) {
     val javaName get() = when (algorithm.lowercase()) {
         "sha1" -> "SHA-1"; "sha256" -> "SHA-256"; "sha512" -> "SHA-512"

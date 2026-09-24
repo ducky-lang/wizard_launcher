@@ -20,18 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.ZipFile
 
-/**
- * Installs vanilla Minecraft plus the Fabric loader straight from Mojang's
- * and Fabric's metadata - no third-party launcher library in between.
- *
- * Every file Mojang publishes a SHA-1 for (client jar, libraries, asset
- * index, every asset object) is verified before it is used, and the version
- * JSON itself is verified against the SHA-1 in Mojang's manifest, so the
- * chain of trust runs from one HTTPS request to piston-meta.mojang.com.
- *
- * Once installed, [VersionProfile.load] reads everything from disk: launching
- * never needs the network.
- */
 class MinecraftInstaller(
     private val paths: AppPaths,
     private val state: InstallState,
@@ -88,9 +76,6 @@ class MinecraftInstaller(
         parallel(todo) { lib ->
             val target = paths.libraries.resolve(lib.path)
             if (lib.sha1 == null) {
-                // Fabric's Maven does not always publish a SHA-1 in the profile.
-                // HTTPS + the host allow-list still apply; the file is only
-                // fetched if it is not already present.
                 if (!Files.isRegularFile(target)) downloader.download(lib.url!!, target, resume = false)
             } else {
                 downloader.download(lib.url!!, target, Checksum.sha1(lib.sha1))
@@ -110,7 +95,7 @@ class MinecraftInstaller(
                     .filter { !it.isDirectory && !it.name.startsWith("META-INF/") }
                     .filter { it.name.endsWith(".dll") || it.name.endsWith(".so") || it.name.endsWith(".dylib") || it.name.endsWith(".jnilib") }
                     .forEach { entry ->
-                        // Natives are flat by convention; the file name alone decides.
+
                         val target = dir.resolve(entry.name.substringAfterLast('/'))
                         zip.getInputStream(entry).use { Files.copy(it, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
                     }
@@ -171,10 +156,6 @@ data class Library(val name: String, val path: String, val url: String?, val sha
     }
 }
 
-/**
- * A launchable version: vanilla JSON with the Fabric profile layered on top,
- * rules already evaluated for this machine.
- */
 class VersionProfile(
     val id: String,
     val mainClass: String,
@@ -197,7 +178,7 @@ class VersionProfile(
 
         fun merge(paths: AppPaths, vanilla: JsonObject, fabric: JsonObject): VersionProfile {
             val mc = vanilla.get("id").asString
-            // Fabric first: where both ship the same artifact, the loader's pick wins.
+
             val libs = LinkedHashMap<String, Library>()
             for (lib in parseLibraries(fabric) + parseLibraries(vanilla)) libs.putIfAbsent(lib.key, lib)
             fun args(o: JsonObject, kind: String) = o.getAsJsonObject("arguments")?.getAsJsonArray(kind)?.toList() ?: emptyList()
@@ -237,7 +218,6 @@ class VersionProfile(
     }
 }
 
-/** Mojang's `rules` arrays: allow/disallow by OS, architecture and feature. */
 object Rules {
     fun allow(rules: JsonArray?, features: Map<String, Boolean> = emptyMap()): Boolean {
         if (rules == null || rules.size() == 0) return true
@@ -256,11 +236,6 @@ object Rules {
         return allowed
     }
 
-    /**
-     * 1.20.1 lists LWJGL natives for every architecture of an OS side by side
-     * (`natives-macos`, `natives-macos-arm64`, ...). They share file names,
-     * so only the one matching this CPU may be used.
-     */
     fun nativesMatchArch(classifier: String): Boolean {
         val tag = when {
             classifier.endsWith("-arm64") -> "aarch64"

@@ -16,7 +16,6 @@ object Json {
 
     fun write(path: Path, value: Any) = writeText(path, gson.toJson(value))
 
-    /** Write-to-temp-then-rename, so a crash never leaves a half-written file. */
     fun writeText(path: Path, text: String) {
         path.parent?.let { Files.createDirectories(it) }
         val tmp = path.resolveSibling(path.fileName.toString() + ".tmp")

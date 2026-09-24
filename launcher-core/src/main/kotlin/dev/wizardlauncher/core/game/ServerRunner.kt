@@ -17,16 +17,8 @@ import java.net.Socket
 import java.nio.file.Files
 import java.nio.file.Path
 
-/** Ports actually in use this session (the catalog's, unless taken). */
 data class SessionPorts(val server: Int, val proxy: Int)
 
-/**
- * Prepares and runs the 1.16.5 world server and the version bridge.
- *
- * Default is *hosted*: one JVM running dev.wizardlauncher.host.ServerHost,
- * which loads the server and ViaProxy side by side (see server-host). The
- * 1.x two-JVM layout remains as `split` in the catalog, as a fallback.
- */
 class ServerRunner(
     private val paths: AppPaths,
     private val settings: Settings,
@@ -39,15 +31,13 @@ class ServerRunner(
     @Volatile var ports = SessionPorts(catalog.server.port, catalog.server.proxyPort)
         private set
 
-    // ------------------------------------------------------------------ preparation
     fun verifyBundledJars() {
         for (pin in listOf(catalog.server.serverJar, catalog.server.proxyJar)) {
             val file = paths.resources.resolve(pin.path)
             if (!Files.isRegularFile(file)) throw LauncherException(
                 "A game component is missing:\n$file\n\nReinstall Wizard Launcher, or check that your antivirus has not quarantined it.")
             if (pin.sha256.isBlank()) continue
-            // Hashing 80 MB on every launch is wasted work; size+mtime+pin is
-            // recorded after one successful check.
+
             val stamp = InstallState.fingerprint(pin.sha256, Files.size(file), Files.getLastModifiedTime(file).toMillis())
             if (state.matches("verified:${pin.path}", stamp)) continue
             if (!Hashes.matches(Hashes.of(file, "SHA-256"), pin.sha256)) throw LauncherException(
@@ -60,7 +50,7 @@ class ServerRunner(
     fun configure(playerName: String?) {
         val dir = paths.serverDir
         Files.createDirectories(dir)
-        Files.writeString(dir.resolve("eula.txt"), "# Accepted via the Wizard Launcher installer (Minecraft EULA)\neula=true\n")
+        Files.writeString(dir.resolve("eula.txt"), "eula=true\n")
         ports = choosePorts()
         writeProperties(dir.resolve("server.properties"))
         if (playerName != null) writePlayerAccess(dir, playerName)
@@ -83,19 +73,11 @@ class ServerRunner(
         return SessionPorts(server, proxy)
     }
 
-    /**
-     * Rewritten every launch (the server rewrites it on shutdown). Gameplay
-     * values from the catalog first, security values last so they always win:
-     * a hand-edited catalog can tune flight but can never re-open RCON or bind
-     * the world to the whole network.
-     */
     private fun writeProperties(file: Path) {
         val lan = settings.allowLan
         val enforced = LinkedHashMap(catalog.server.properties)
         enforced["view-distance"] = settings.viewDistance.toString()
         enforced.putAll(mapOf(
-            // The server itself only ever listens on loopback; LAN players
-            // come in through the bridge, which is the one bound wider.
             "server-ip" to "127.0.0.1",
             "server-port" to ports.server.toString(),
             "online-mode" to "false",
@@ -105,9 +87,7 @@ class ServerRunner(
             "enable-jmx-monitoring" to "false",
             "snooper-enabled" to "false",
             "prevent-proxy-connections" to "false",
-            // Offline mode means a name is all it takes to join. With the
-            // bridge on loopback nobody else can reach it anyway; the
-            // whitelist is defence in depth for the moment someone turns LAN on.
+
             "white-list" to (!lan).toString(),
             "enforce-whitelist" to (!lan).toString(),
         ))
@@ -122,7 +102,6 @@ class ServerRunner(
         Files.write(file, out)
     }
 
-    /** Operator (singleplayer-with-cheats parity) and whitelist, keyed by the offline UUID. */
     private fun writePlayerAccess(dir: Path, name: String) {
         val uuid = OfflineUuid.of(name).toString()
         Json.write(dir.resolve("ops.json"), JsonArray().apply {
@@ -136,7 +115,6 @@ class ServerRunner(
         })
     }
 
-    // ------------------------------------------------------------------ processes
     fun start() {
         val serverJar = paths.resources.resolve(catalog.server.serverJar.path)
         val proxyJar = paths.resources.resolve(catalog.server.proxyJar.path)
@@ -195,16 +173,10 @@ class ServerRunner(
         throw LauncherException("$what did not finish starting within 3 minutes. Press Play again - the first start is the slowest.")
     }
 
-    /** Hosted mode: the server shuts itself down (saving) when the game exits. */
     fun watchClient(pid: Long) {
         if (catalog.server.mode != "split") supervisor.send("server", "watch $pid")
     }
 
-    /**
-     * Brings the server back if it dies while the game is still running, up
-     * to [maxRestarts] times. Without it an out-of-memory mid-session drops
-     * the player to "connection lost" with no way back but a restart.
-     */
     fun superviseWhile(clientAlive: () -> Boolean, maxRestarts: Int = 2, onEvent: (String) -> Unit) {
         if (!settings.autoRestartServer) return
         Thread({

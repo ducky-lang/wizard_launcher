@@ -10,12 +10,11 @@ import dev.wizardlauncher.core.net.Connectivity
 import dev.wizardlauncher.core.security.SecretStore
 import java.nio.file.Path
 
-/** Who is playing. */
 data class Account(
     val name: String,
     val uuid: String,
     val accessToken: String,
-    val userType: String,  // "msa" or "legacy"
+    val userType: String,
     val xuid: String = "",
     val clientId: String = "",
 ) {
@@ -29,19 +28,6 @@ data class Account(
     }
 }
 
-/**
- * Microsoft account with an offline fallback.
- *
- * Only non-secret profile data (name, UUID) is in `account.json`; the
- * refresh token is in the OS secret store and the short-lived Minecraft
- * access token lives in memory only.
- *
- * Offline behaviour: the world server is local and offline-mode, so a
- * signed-in player can play with no internet at all. When the token cannot
- * be refreshed because there is no connection, the cached profile is used
- * with a placeholder token - the game still shows the right name, and the
- * local server never checks the token.
- */
 class AccountManager(private val profileFile: Path, private val secrets: SecretStore, private val settings: Settings) {
     private val auth = MicrosoftAuth()
     @Volatile private var session: MicrosoftAuth.Session? = null
@@ -66,7 +52,6 @@ class AccountManager(private val profileFile: Path, private val secrets: SecretS
         java.nio.file.Files.deleteIfExists(profileFile)
     }
 
-    /** The account to launch with. Never needs the network to succeed. */
     fun current(): Account? {
         val profile = cachedProfile()
         if (profile == null) return settings.offlineName.takeIf { it.isNotBlank() }?.let(Account::offline)

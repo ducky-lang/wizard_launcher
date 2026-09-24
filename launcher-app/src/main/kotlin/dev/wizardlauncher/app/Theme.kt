@@ -5,7 +5,6 @@ import java.awt.Color
 import java.awt.Font
 import javax.swing.UIManager
 
-/** The castle palette, carried over from the 1.x launcher's theme.json. */
 object Theme {
     val bg = Color(0x08080c)
     val panel = Color(0x111118)

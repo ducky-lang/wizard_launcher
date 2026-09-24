@@ -1,6 +1,5 @@
 package dev.wizardlauncher.core.install
 
-/** Launch progress: a fraction in 0..1 (null = indeterminate) and a message. */
 fun interface Progress {
     fun update(fraction: Double?, message: String)
 

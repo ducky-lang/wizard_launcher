@@ -8,16 +8,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 
-/**
- * Which JVM runs the game and the world.
- *
- * The installer ships the launcher on its own Java 17 runtime, and that same
- * runtime runs the 1.20.1 client *and* the 1.16.5 server (vanilla 1.16.5
- * runs fine on 17). One bundled JVM, nothing to download, nothing to find -
- * which is most of what "works offline" means for Java.
- *
- * A path set in Settings overrides it, for players who want a specific JDK.
- */
 object JavaLocator {
     fun find(settings: Settings, requiredMajor: Int): Path {
         settings.javaPath.takeIf { it.isNotBlank() }?.let { configured ->

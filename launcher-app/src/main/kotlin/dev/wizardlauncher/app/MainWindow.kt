@@ -106,12 +106,9 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         }
     }
 
-    // ------------------------------------------------------------------ layout
     private fun header(): JComponent = JPanel(BorderLayout()).apply {
         isOpaque = false
         val logo = runCatching {
-            // Scaled synchronously: getScaledInstance() loads lazily and the
-            // first layout would size the label to nothing.
             val source = ImageIO.read(MainWindow::class.java.getResource("logo.png"))
             val scaled = java.awt.image.BufferedImage(72, 72, java.awt.image.BufferedImage.TYPE_INT_ARGB)
             scaled.createGraphics().apply {
@@ -200,7 +197,6 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
 
     private fun JMenu.item(text: String, action: () -> Unit) = add(JMenuItem(text).apply { addActionListener { action() } })
 
-    // ------------------------------------------------------------------ account
     private fun refreshAccount() {
         val profile = launcher.accounts.cachedProfile()
         val offlineName = launcher.settings.offlineName
@@ -228,7 +224,6 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         return true
     }
 
-    // ------------------------------------------------------------------ actions
     private fun onPlay() {
         if (busy) return
         busy = true
@@ -237,8 +232,6 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         progress.isVisible = true
         status.text = "Checking your account..."
         thread(name = "play") {
-            // Resolving the account may refresh a Microsoft token over the
-            // network, so it happens here and never on the UI thread.
             var account = runCatching { launcher.accounts.current() }.getOrNull()
             if (account == null) {
                 var named = false
@@ -280,8 +273,6 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
 
     private fun onClose() {
         if (launcher.supervisor.isRunning("client")) {
-            // The world server watches the game process and saves + stops on
-            // its own when the game exits, so the launcher can go.
             Log.info("Launcher closed while playing; the world will stop when Minecraft does.")
             dispose(); System.exit(0)
         }
@@ -329,7 +320,6 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         background("Importing...") { OfflineBundle.import(launcher.paths, source, uiProgress()) }
     }
 
-    // ------------------------------------------------------------------ helpers
     private fun uiProgress() = Progress { fraction, message ->
         ui {
             progress.isVisible = true
@@ -370,7 +360,6 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         return if (result == JFileChooser.APPROVE_OPTION) chooser.selectedFile.toPath() else null
     }
 
-    /** A slow vertical wash that lifts the flat black, as in 1.x. */
     private class Backdrop : JPanel() {
         override fun paintComponent(g: Graphics) {
             val g2 = g as Graphics2D
@@ -384,7 +373,6 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         val STATE_RULES_TEMPLATE = """
             {
               "format": 1,
-              "_help": "Rules applied on top of the built-in 1.16.5 -> 1.20.1 conversion. Delete what you do not need.",
               "states": {
                 "minecraft:note_block": {
                   "instrument=harp,note=1,powered=false": { "model": "minecraft:block/note_block" }

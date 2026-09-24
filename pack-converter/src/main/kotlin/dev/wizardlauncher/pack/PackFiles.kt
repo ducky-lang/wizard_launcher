@@ -10,20 +10,12 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.relativeTo
 
-/**
- * Read-only view of a resource pack, either a folder or a .zip.
- *
- * Paths are always forward-slash, relative to the pack root (the folder that
- * holds pack.mcmeta). A zip whose only content is one top-level folder - the
- * way most packs are uploaded - is unwrapped transparently.
- */
 class PackSource private constructor(
     private val zip: ZipFile?,
     private val dir: Path?,
     private val prefix: String,
     val paths: List<String>,
 ) : AutoCloseable {
-
     fun exists(path: String) = path in pathSet
     private val pathSet: Set<String> by lazy { paths.toHashSet() }
 
@@ -71,7 +63,6 @@ class PackSource private constructor(
             return if (single != null && single.resolve("pack.mcmeta").isRegularFile()) single else dir
         }
 
-        /** Rejects entries that could escape the output (zip slip) or are junk. */
         internal fun safePath(path: String): Boolean {
             if (path.isEmpty() || path.startsWith("/") || path.contains('\\') || path.contains(':')) return false
             return path.split('/').none { it == ".." || it == "." || it.isEmpty() }
@@ -79,11 +70,6 @@ class PackSource private constructor(
     }
 }
 
-/**
- * Writes the converted pack. Unchanged files are streamed straight from the
- * source, so a 400 MB pack is never held in memory - only the few JSON and
- * shader files that were actually rewritten are.
- */
 class PackSink(private val output: Path) : AutoCloseable {
     private val written = HashSet<String>()
     private val asZip = output.fileName.toString().endsWith(".zip", ignoreCase = true)
@@ -120,7 +106,6 @@ class PackSink(private val output: Path) : AutoCloseable {
 
     fun contains(path: String) = path in written
 
-    /** Atomically swaps the finished pack into place. */
     override fun close() {
         zip?.close()
         deleteRecursively(output)

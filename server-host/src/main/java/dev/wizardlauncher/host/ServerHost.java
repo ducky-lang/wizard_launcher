@@ -25,38 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Runs the 1.16.5 world server and the ViaProxy version bridge in ONE JVM.
- *
- * <p>The previous launcher started two JVMs: the server, and ViaProxy next to
- * it so the 1.20.1 client could talk to it. Each JVM carries its own fixed
- * cost - JIT code cache, metaspace, GC bookkeeping, thread stacks, a second
- * heap sized for the worst case - so on an 8 GB laptop the bridge alone cost
- * several hundred megabytes that the game could have used.
- *
- * <p>Here the two share a heap and a runtime but not their classes. They
- * cannot share classes: the 1.16.5 server was built against Netty 4.1.25 and
- * Log4j 2.8, ViaProxy against current releases of both. So:
- * <ul>
- *   <li>ViaProxy lives on the system class path, where its own bootstrap
- *       (instrumentation + injection class loader) expects to be;</li>
- *   <li>the server is loaded by an isolated {@link URLClassLoader} whose
- *       parent is the platform loader, so it sees none of ViaProxy's classes
- *       and ViaProxy sees none of its.</li>
- * </ul>
- *
- * <h2>Control channel</h2>
- * The process's real stdin belongs to this host, one command per line:
- * <pre>
- *   stop          save the world and exit
- *   watch PID     stop (and save) as soon as process PID exits
- *   cmd TEXT      run TEXT on the server console
- * </pre>
- * {@code stop} works through {@link System#exit}: the vanilla server
- * registers a "Server Shutdown Thread" hook that halts it and saves every
- * loaded chunk, so exiting is a clean shutdown on every OS - including
- * Windows, where killing a process never runs shutdown hooks.
- */
 public final class ServerHost {
     private static final PrintStream OUT = System.out;
     private static final AtomicBoolean STOPPING = new AtomicBoolean();
@@ -77,9 +45,7 @@ public final class ServerHost {
 
         Path log4j = writeLog4jConfig();
         System.setProperty("log4j.configurationFile", log4j.toString());
-        // Also makes the (pre-2.10) Log4j inside the 1.16.5 server skip the
-        // lookup machinery entirely; the config's %msg{nolookups} is what
-        // actually closes CVE-2021-44228 for that version.
+
         System.setProperty("log4j2.formatMsgNoLookups", "true");
 
         startControlThread(control, consoleFeed);
@@ -96,8 +62,6 @@ public final class ServerHost {
         }
         log("World server listening on " + serverPort + ".");
 
-        // The server's Log4j has read its config by now. ViaProxy ships its
-        // own Log4j with its own setup, so it must not pick up the server's.
         System.clearProperty("log4j.configurationFile");
 
         if (proxyBind != null && !proxyBind.isBlank()) {
@@ -108,9 +72,6 @@ public final class ServerHost {
         log("READY");
     }
 
-    // ------------------------------------------------------------------
-    // Server
-    // ------------------------------------------------------------------
     private static Thread startServer(Path serverJar, String serverArgs) throws Exception {
         URLClassLoader loader = new URLClassLoader(
                 "wizard-server", new URL[]{serverJar.toUri().toURL()}, ClassLoader.getPlatformClassLoader());
@@ -132,13 +93,7 @@ public final class ServerHost {
         return thread;
     }
 
-    // ------------------------------------------------------------------
-    // Proxy
-    // ------------------------------------------------------------------
     private static void startProxy(String bind, String target, String version, String extra) throws Exception {
-        // ViaProxy's console reader would otherwise compete with the
-        // server's for stdin; a stream whose available() throws is how
-        // ViaProxy is told "no console here".
         System.setIn(new NoConsole());
         System.setProperty("skipUpdateCheck", "true");
         System.setProperty("java.awt.headless", "true");
@@ -177,9 +132,6 @@ public final class ServerHost {
         log("Version bridge listening on " + bind + ".");
     }
 
-    // ------------------------------------------------------------------
-    // Control & lifecycle
-    // ------------------------------------------------------------------
     private static void startControlThread(InputStream control, OutputStream consoleFeed) {
         Thread thread = new Thread(() -> {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(control, StandardCharsets.UTF_8))) {
@@ -198,9 +150,7 @@ public final class ServerHost {
             } catch (IOException | NumberFormatException e) {
                 log("Control channel error: " + e.getMessage());
             }
-            // The launcher's end of the pipe closed: the launcher is gone.
-            // Keep running if a client is being watched - that is the whole
-            // point of "close the launcher while playing" - otherwise stop.
+
             if (!WATCHING.get()) {
                 shutdown("control channel closed");
             }
@@ -211,7 +161,6 @@ public final class ServerHost {
 
     private static final AtomicBoolean WATCHING = new AtomicBoolean();
 
-    /** Replaces the old detached watchdog process: the server stops itself. */
     private static void watch(long pid) {
         ProcessHandle.of(pid).ifPresentOrElse(handle -> {
             WATCHING.set(true);
@@ -228,8 +177,6 @@ public final class ServerHost {
                 if (portOpen(serverPort)) {
                     misses = 0;
                 } else if (++misses >= 5) {
-                    // The server stopped by itself (for example /stop in game)
-                    // but ViaProxy's threads would keep the JVM alive forever.
                     shutdown("world server is no longer listening");
                     return;
                 }
@@ -244,16 +191,11 @@ public final class ServerHost {
             return;
         }
         log("Shutting down: " + reason + ". Saving the world...");
-        // System.exit blocks until shutdown hooks - including the server's
-        // save-and-halt - have finished. Run it off the calling thread so a
-        // hook can never deadlock against the thread that triggered it.
+
         Thread exit = new Thread(() -> System.exit(0), "Wizard-Exit");
         exit.start();
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
     static boolean waitForPort(int port, Thread owner, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
@@ -261,8 +203,6 @@ public final class ServerHost {
                 return true;
             }
             if (owner != null && !owner.isAlive() && !STOPPING.get()) {
-                // Bootstrap threads return once the server thread is running,
-                // so a dead bootstrap alone is not failure - keep polling.
                 owner = null;
             }
             sleep(250);
@@ -324,7 +264,6 @@ public final class ServerHost {
         OUT.flush();
     }
 
-    /** An stdin replacement that reports "no console available". */
     private static final class NoConsole extends InputStream {
         @Override
         public int read() throws IOException {

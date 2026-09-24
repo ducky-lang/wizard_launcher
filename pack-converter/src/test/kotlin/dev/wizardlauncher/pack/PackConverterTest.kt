@@ -31,7 +31,7 @@ class PackConverterTest {
                 "level=3":{"model":"minecraft:block/cauldron_level3"}}}""",
             "assets/minecraft/textures/block/grass_path_top.png" to "png",
             "assets/wizard/models/block/cauldron_two.json" to """{"parent":"minecraft:block/cauldron_level1"}""",
-            // A 1.16-style custom model: textures outside block/ and item/.
+
             "assets/wizard/models/item/wand.json" to """{"parent":"item/generated","textures":{
                 "layer0":"wizard:custom/wand/core","layer1":"minecraft:entity/chest/normal"}}""",
             "assets/wizard/textures/custom/wand/core.png" to "png",
@@ -53,14 +53,14 @@ class PackConverterTest {
         ).mapValues { it.value.toByteArray() }.toMutableMap()
         files["assets/minecraft/textures/font/unicode_page_e0.png"] = fontPage()
         files["assets/minecraft/font/glyph_sizes.bin"] = ByteArray(65536).also {
-            it[0xE000] = 0x24          // columns 2..4
-            it[0xE001] = 0x07          // blank glyph with a width -> space
+            it[0xE000] = 0x24
+            it[0xE001] = 0x07
         }
         files.putAll(extra)
         val zip = tmp.resolve("legacy.zip")
         ZipOutputStream(Files.newOutputStream(zip)).use { out ->
             files.forEach { (name, data) ->
-                // Wrapped in a top-level folder, the way packs are usually zipped.
+
                 out.putNextEntry(ZipEntry("Castle Pack/$name")); out.write(data); out.closeEntry()
             }
         }
@@ -70,7 +70,7 @@ class PackConverterTest {
     private fun fontPage(): ByteArray {
         val img = BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB)
         for (y in 0 until 16) for (x in 0 until 16) img.setRGB(x, y, if (x in 2..4) 0xFFFF0000.toInt() else 0)
-        img.setRGB(15, 0, 0xFF00FF00.toInt()) // stray pixel outside glyph_sizes range must be dropped
+        img.setRGB(15, 0, 0xFF00FF00.toInt())
         return ByteArrayOutputStream().also { ImageIO.write(img, "png", it) }.toByteArray()
     }
 
@@ -110,7 +110,7 @@ class PackConverterTest {
             assertEquals("minecraft:block/water_cauldron_level1", water.getAsJsonObject("level=1").get("model").asString)
             assertEquals("wizard:block/cauldron_two", water.getAsJsonObject("level=2").get("model").asString)
             assertEquals("minecraft:block/water_cauldron_full", water.getAsJsonObject("level=3").get("model").asString)
-            // A custom model inheriting from a renamed vanilla one is re-pointed too.
+
             assertEquals("minecraft:block/water_cauldron_level1",
                 it.json("assets/wizard/models/block/cauldron_two.json").get("parent").asString)
         }
@@ -131,12 +131,12 @@ class PackConverterTest {
             val providers = it.json("assets/minecraft/font/default.json").getAsJsonArray("providers").map { p -> p.asJsonObject }
             assertFalse(providers.any { p -> p.get("type").asString == "legacy_unicode" })
             val space = providers.first { p -> p.get("type").asString == "space" }
-            assertEquals(5, space.getAsJsonObject("advances").get("\uE001").asInt) // (7-0+1)/2+1 = 5
+            assertEquals(5, space.getAsJsonObject("advances").get("\uE001").asInt)
             val bitmap = providers.first { p -> p.get("file")?.asString?.contains("wizard_legacy") == true }
             assertEquals('\uE000', bitmap.getAsJsonArray("chars")[0].asString[0])
             val page = ImageIO.read(it.getInputStream(it.getEntry("assets/minecraft/textures/font/wizard_legacy_unicode_page_e0.png")))
-            assertEquals(0xFFFF0000.toInt(), page.getRGB(0, 0))  // column 2 moved to the cell edge
-            assertEquals(0, page.getRGB(15, 0) ushr 24)           // outside the glyph's range: dropped
+            assertEquals(0xFFFF0000.toInt(), page.getRGB(0, 0))
+            assertEquals(0, page.getRGB(15, 0) ushr 24)
         }
     }
 
