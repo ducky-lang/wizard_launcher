@@ -1,2 +1,0 @@
-class LauncherError(Exception):
-    pass
