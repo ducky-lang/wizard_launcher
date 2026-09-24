@@ -171,6 +171,32 @@ class LegacyTranslatorTest {
         }
     }
 
+    @Test fun `a listed file the game cannot read is skipped instead of failing the pack`() {
+        val files = legacyFiles()
+        files["assets/minecraft/blockstates/Jungle_leaves.json"] = """{"variants":{"":{"model":"block/jungle_leaves"}}}""".toByteArray()
+        val o = FilePackView.open(zipOf(files)).use { real ->
+            val view = object : PackView by real {
+                override fun read(path: String): ByteArray =
+                    if (path.contains("Jungle_leaves")) throw java.io.IOException("not in pack: $path") else real.read(path)
+            }
+            LegacyTranslator.translate(view, 6)
+        }
+        assertTrue(o.warnings().any { "Jungle_leaves" in it })
+        assertNotNull(o.file("assets/minecraft/blockstates/water_cauldron.json"))
+        assertNotNull(o.file("assets/minecraft/atlases/blocks.json"))
+    }
+
+    @Test fun `an overlay survives a round trip through the cache format`() {
+        val o = overlay()
+        val bytes = ByteArrayOutputStream().also { o.write(it) }.toByteArray()
+        val back = Overlay.read(ByteArrayInputStream(bytes))
+        assertEquals(o.files().keys, back.files().keys)
+        o.files().forEach { (k, v) -> assertTrue(v.contentEquals(back.file(k)), k) }
+        assertEquals(o.aliases(), back.aliases())
+        assertEquals(o.warnings(), back.warnings())
+        assertEquals(o.report(), back.report())
+    }
+
     @Test fun `unsafe paths and bad rules are refused`() {
         assertFalse(FilePackView.safePath("../evil.txt"))
         assertFalse(FilePackView.safePath("assets/../../x"))

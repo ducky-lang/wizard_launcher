@@ -23,6 +23,7 @@ import java.util.function.Predicate;
 public final class LegacyTranslator {
     public static final int TARGET_FORMAT = 15;
     public static final int OLDEST_FORMAT = 4;
+    public static final int REVISION = 2;
     public static final String PACK_RULES = "wizard-states.json";
     public static final Set<String> VANILLA_TEXTURE_ROOTS = Set.of(
         "entity", "misc", "environment", "gui", "font", "painting", "mob_effect", "particle",
@@ -35,6 +36,7 @@ public final class LegacyTranslator {
     private final Rules rules;
     private final Overlay overlay;
     private final Map<String, JsonElement> json = new LinkedHashMap<>();
+    private final Map<String, Set<String>> modelTextures = new LinkedHashMap<>();
     private final Predicate<String> vanilla;
 
     private LegacyTranslator(PackView pack, int sourceFormat, Rules rules, Predicate<String> vanilla) {
@@ -85,7 +87,11 @@ public final class LegacyTranslator {
         for (String ns : pack.namespaces()) {
             for (String path : pack.list(ns, "models")) {
                 if (path.endsWith(".json")) {
-                    edit(path, root -> remapModel(root.getAsJsonObject()));
+                    edit(path, root -> {
+                        boolean changed = remapModel(root.getAsJsonObject());
+                        modelTextures.put(path, texturesOf(root));
+                        return changed;
+                    });
                 }
             }
             for (String path : pack.list(ns, "blockstates")) {
@@ -153,13 +159,19 @@ public final class LegacyTranslator {
         boolean apply(JsonElement root) throws IOException;
     }
 
-    private JsonElement readJson(String path) throws IOException {
+    private JsonElement readJson(String path) {
         JsonElement cached = json.get(path);
         if (cached != null) {
             return cached;
         }
         String source = overlay.aliasOf(path) != null ? overlay.aliasOf(path) : path;
-        String text = pack.readText(source);
+        String text;
+        try {
+            text = pack.readText(source);
+        } catch (IOException e) {
+            overlay.warn(path + ": could not be read, left as it is (" + truncate(e.getMessage()) + ")");
+            return null;
+        }
         if (text.startsWith("﻿")) {
             text = text.substring(1);
         }
@@ -191,7 +203,7 @@ public final class LegacyTranslator {
             if (edit.apply(root)) {
                 json.put(path, root);
             }
-        } catch (RuntimeException e) {
+        } catch (IOException | RuntimeException e) {
             overlay.warn(path + ": could not be read as expected (" + truncate(e.getMessage()) + ")");
         }
     }
@@ -337,8 +349,15 @@ public final class LegacyTranslator {
         return changed;
     }
 
-    private void upgradeShader(String path, boolean fragment) throws IOException {
-        ShaderUpgrader.Result result = ShaderUpgrader.upgrade(pack.readText(path), fragment);
+    private void upgradeShader(String path, boolean fragment) {
+        String source;
+        try {
+            source = pack.readText(path);
+        } catch (IOException e) {
+            overlay.warn(path + ": could not be read, left as it is (" + truncate(e.getMessage()) + ")");
+            return;
+        }
+        ShaderUpgrader.Result result = ShaderUpgrader.upgrade(source, fragment);
         if (result.problem() != null) {
             overlay.warn(path + ": " + result.problem());
         }
@@ -487,35 +506,14 @@ public final class LegacyTranslator {
     }
 
     private void generateAtlas() throws IOException {
-        Set<String> modelPaths = new LinkedHashSet<>();
-        for (String ns : pack.namespaces()) {
-            for (String path : pack.list(ns, "models")) {
-                if (path.endsWith(".json")) {
-                    modelPaths.add(path);
-                }
-            }
-        }
-        for (String path : json.keySet()) {
-            if (path.matches("^assets/[^/]+/models/.+\\.json$")) {
-                modelPaths.add(path);
+        Map<String, Set<String>> textures = new LinkedHashMap<>(modelTextures);
+        for (Map.Entry<String, JsonElement> e : json.entrySet()) {
+            if (e.getKey().matches("^assets/[^/]+/models/.+\\.json$")) {
+                textures.put(e.getKey(), texturesOf(e.getValue()));
             }
         }
         Set<String> referenced = new TreeSet<>();
-        for (String path : modelPaths) {
-            JsonElement el = json.containsKey(path) ? json.get(path) : readJsonQuiet(path);
-            if (el == null || !el.isJsonObject() || !el.getAsJsonObject().has("textures")) {
-                continue;
-            }
-            JsonElement textures = el.getAsJsonObject().get("textures");
-            if (!textures.isJsonObject()) {
-                continue;
-            }
-            for (Map.Entry<String, JsonElement> e : textures.getAsJsonObject().entrySet()) {
-                if (e.getValue().isJsonPrimitive() && !e.getValue().getAsString().startsWith("#")) {
-                    referenced.add(Res.normalize(e.getValue().getAsString()));
-                }
-            }
-        }
+        textures.values().forEach(referenced::addAll);
         Set<String> singles = new TreeSet<>();
         Set<String> directories = new TreeSet<>();
         for (String id : referenced) {
@@ -566,12 +564,20 @@ public final class LegacyTranslator {
             + " texture(s) added to the block atlas");
     }
 
-    private JsonElement readJsonQuiet(String path) {
-        try {
-            String text = pack.readText(path);
-            return parse(text.startsWith("﻿") ? text.substring(1) : text);
-        } catch (IOException | RuntimeException e) {
-            return null;
+    private static Set<String> texturesOf(JsonElement model) {
+        Set<String> out = new LinkedHashSet<>();
+        if (model == null || !model.isJsonObject()) {
+            return out;
         }
+        JsonElement textures = model.getAsJsonObject().get("textures");
+        if (textures == null || !textures.isJsonObject()) {
+            return out;
+        }
+        for (Map.Entry<String, JsonElement> e : textures.getAsJsonObject().entrySet()) {
+            if (e.getValue().isJsonPrimitive() && !e.getValue().getAsString().startsWith("#")) {
+                out.add(Res.normalize(e.getValue().getAsString()));
+            }
+        }
+        return out;
     }
 }

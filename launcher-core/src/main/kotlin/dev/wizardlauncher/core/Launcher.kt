@@ -17,11 +17,15 @@ import dev.wizardlauncher.core.install.VersionProfile
 import dev.wizardlauncher.core.net.SecureDownloader
 import dev.wizardlauncher.core.runtime.JavaLocator
 import dev.wizardlauncher.core.security.SecretStore
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.FutureTask
 import java.util.concurrent.locks.ReentrantLock
 
 class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
@@ -53,6 +57,8 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
 
     fun play(account: Account, progress: Progress, stage: (Int) -> Unit = {}): Process {
         if (!playLock.tryLock()) throw LauncherException("A launch is already in progress.")
+        var serverStart: FutureTask<Unit>? = null
+        var serverThread: Thread? = null
         try {
             supervisor.reapOrphans()
             if (supervisor.isRunning("client")) throw LauncherException("The game is already running.")
@@ -78,7 +84,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             val versionId = game.ensure(modpack.loaderVersion())
             stage(2)
             modpack.ensure()
-            content.ensureLegacyPackSupport()
+            val clientWaitsForWorld = content.ensureLegacyPackSupport()
             val packName = runCatching { content.ensureResourcePack() }
                 .onFailure { Log.error("The resource pack could not be installed; continuing without it: ${it.message}", it) }
                 .getOrNull()
@@ -89,7 +95,6 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             this.server = server
             server.verifyBundledJars()
             server.configure(account.name)
-            server.start()
 
             val address = "127.0.0.1:${server.ports.proxy}"
             ServersDat.upsert(paths.gameDir.resolve("servers.dat"), catalog.server.entryName, address)
@@ -98,16 +103,36 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
                     compatible = true, stale = listOf("$it (1.20.1).zip"))
             }
 
+            if (clientWaitsForWorld) {
+                serverStart = FutureTask { server.start() }
+                serverThread = Thread(serverStart, "server-start").apply { isDaemon = true; start() }
+            } else {
+                server.start()
+            }
+
             stage(4)
             progress.update(0.9, "Launching Minecraft...")
             Log.info("Launching Minecraft as ${account.name}${if (account.isMicrosoft) "" else " (offline name)"}...")
             val client = ClientRunner(paths, settings, supervisor, java, tool("wizard-client-boot.jar"))
-                .launch(VersionProfile.load(paths, versionId), account, address)
+                .launch(VersionProfile.load(paths, versionId), account, address, waitForWorld = clientWaitsForWorld)
+            serverStart?.let { start ->
+                progress.update(0.95, "Minecraft is loading while the world finishes starting...")
+                try {
+                    start.get()
+                } catch (e: ExecutionException) {
+                    supervisor.stop("client", graceful = false)
+                    throw e.cause as? Exception ?: e
+                }
+            }
             server.watchClient(client.pid())
             server.superviseWhile({ client.isAlive }) { Log.info(it) }
             progress.update(1.0, "Enjoy the castle!")
             return client
         } catch (e: Exception) {
+            serverThread?.let {
+                it.interrupt()
+                it.join(10_000)
+            }
             server?.stop()
             throw e
         } finally {
@@ -162,15 +187,18 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         }
         val log = paths.gameDir.resolve("logs").resolve("latest.log")
         Files.deleteIfExists(log)
+        val closedPort = ServerSocket(0, 0, InetAddress.getLoopbackAddress()).use { it.localPort }
         progress.update(null, "Starting Minecraft for a smoke test...")
         val client = ClientRunner(paths, settings, supervisor, java, tool("wizard-client-boot.jar"))
-            .launch(VersionProfile.load(paths, game.fabricId(modpack.loaderVersion())), Account.offline("WizardSmoke"), null)
+            .launch(VersionProfile.load(paths, game.fabricId(modpack.loaderVersion())), Account.offline("WizardSmoke"),
+                "127.0.0.1:$closedPort", waitForWorld = true)
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000
         val markers = linkedMapOf(
             "Fabric loaded mods" to Regex("Loading \\d+ mods"),
             "Legacy pack support active" to Regex("Wizard Legacy Packs active"),
             "Legacy pack read natively" to Regex("Reading '.*' \\(pack_format \\d+\\) natively"),
             "Block atlas built" to Regex("Created: .*minecraft:textures/atlas/blocks\\.png-atlas"),
+            "One-click join waits for the world" to Regex("Holding the one-click join"),
         )
         val seen = LinkedHashSet<String>()
         var text = ""

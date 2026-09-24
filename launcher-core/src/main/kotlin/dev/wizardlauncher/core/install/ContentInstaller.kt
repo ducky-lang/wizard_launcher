@@ -69,12 +69,12 @@ class ContentInstaller(
         return name
     }
 
-    fun ensureLegacyPackSupport() {
+    fun ensureLegacyPackSupport(): Boolean {
         val bundled = paths.resources.resolve("mods").resolve(LEGACY_MOD)
         val target = paths.gameDir.resolve("mods").resolve(LEGACY_MOD)
         if (!Files.isRegularFile(bundled)) {
             Log.info("Legacy pack support is not part of this build; older resource packs may not display correctly.")
-            return
+            return false
         }
         if (!Files.isRegularFile(target) || Files.size(target) != Files.size(bundled) ||
             Hashes.of(target, "SHA-256") != Hashes.of(bundled, "SHA-256")) {
@@ -89,10 +89,12 @@ class ContentInstaller(
         } else {
             Files.deleteIfExists(configRules)
         }
+        return runCatching { java.util.zip.ZipFile(target.toFile()).use { it.getEntry(WORLD_GATE) != null } }.getOrDefault(false)
     }
 
     companion object {
         const val LEGACY_MOD = "wizard-legacy-packs.jar"
+        const val WORLD_GATE = "dev/wizardlauncher/legacypacks/WorldGate.class"
 
         fun requireSpace(paths: AppPaths, mb: Int) {
             val free = runCatching { Files.getFileStore(paths.root).usableSpace / (1024 * 1024) }.getOrDefault(Long.MAX_VALUE)

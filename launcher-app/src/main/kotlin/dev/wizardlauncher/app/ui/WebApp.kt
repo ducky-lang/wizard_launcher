@@ -265,7 +265,7 @@ class WebApp(private val launcher: Launcher) : Bridge.Host {
                 flushScheduled = false
                 pendingLogs.toList().also { pendingLogs.clear() }
             }
-            batch.takeLast(300).forEach { emit("log", mapOf("line" to it)) }
+            if (batch.isNotEmpty()) emit("logs", mapOf("lines" to batch.takeLast(300)))
         }.apply { isRepeats = false; start() }
     }
 
