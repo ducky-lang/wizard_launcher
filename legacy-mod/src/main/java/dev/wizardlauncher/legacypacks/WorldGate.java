@@ -23,7 +23,7 @@ public final class WorldGate {
         ServerAddress parsed = ServerAddress.parseString(address);
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress(parsed.getHost(), parsed.getPort()), 300);
-            return true;
+            return socket.getLocalPort() != socket.getPort() || !socket.getLocalAddress().equals(socket.getInetAddress());
         } catch (Exception e) {
             return false;
         }

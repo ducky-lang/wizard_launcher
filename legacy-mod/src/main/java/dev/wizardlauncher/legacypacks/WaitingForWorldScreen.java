@@ -11,10 +11,12 @@ import net.minecraft.network.chat.Component;
 
 public final class WaitingForWorldScreen extends GenericDirtMessageScreen {
     private static final long GIVE_UP_MS = 5 * 60_000L;
+    private static final long PROBE_EVERY_MS = 500;
     private final String address;
     private final long started = System.currentTimeMillis();
     private CompletableFuture<Boolean> probe = CompletableFuture.completedFuture(false);
     private boolean done;
+    private long lastProbe;
 
     public WaitingForWorldScreen(String address) {
         super(Component.translatableWithFallback("wizard.waiting.title", "Opening the castle gates..."));
@@ -42,7 +44,9 @@ public final class WaitingForWorldScreen extends GenericDirtMessageScreen {
             QuickPlayAccessor.wizard$joinMultiplayerWorld(minecraft, address);
             return;
         }
-        if (probe.isDone()) {
+        long now = System.currentTimeMillis();
+        if (probe.isDone() && now - lastProbe >= PROBE_EVERY_MS) {
+            lastProbe = now;
             probe = CompletableFuture.supplyAsync(() -> WorldGate.isOpen(address));
         }
     }
