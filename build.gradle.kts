@@ -60,3 +60,46 @@ tasks.register("makeIcons") {
         outputs[2].writeBytes(png(256))
     }
 }
+
+val bundledDir = layout.buildDirectory.dir("bundled")
+
+data class PinnedDownload(val url: String, val path: String, val algorithm: String, val digest: String)
+
+val pinnedDownloads = listOf(
+    PinnedDownload(
+        "https://piston-data.mojang.com/v1/objects/1b557e7b033b583cd9f66746b7a9ab1ec1673ced/server.jar",
+        "servers/1.16.5/server.jar", "SHA-1", "1b557e7b033b583cd9f66746b7a9ab1ec1673ced",
+    ),
+    PinnedDownload(
+        "https://github.com/ViaVersion/ViaProxy/releases/download/v3.4.12/ViaProxy-3.4.12.jar",
+        "proxy/ViaProxy.jar", "SHA-256", "32ce9ad871aeb03286823c29da262ebd75992864e7857db283f103525c7fc0cb",
+    ),
+)
+
+tasks.register("fetchGameJars") {
+    group = "distribution"
+    outputs.dir(bundledDir)
+    doLast {
+        fun digest(file: File, algorithm: String): String {
+            val md = java.security.MessageDigest.getInstance(algorithm)
+            file.inputStream().use { input ->
+                val buffer = ByteArray(1 shl 16)
+                while (true) { val n = input.read(buffer); if (n < 0) break; md.update(buffer, 0, n) }
+            }
+            return md.digest().joinToString("") { "%02x".format(it) }
+        }
+        for (pin in pinnedDownloads) {
+            val target = bundledDir.get().file(pin.path).asFile
+            if (target.isFile && digest(target, pin.algorithm) == pin.digest) continue
+            target.parentFile.mkdirs()
+            val part = File(target.path + ".part")
+            java.net.URI(pin.url).toURL().openStream().use { input -> part.outputStream().use { input.copyTo(it) } }
+            val actual = digest(part, pin.algorithm)
+            if (actual != pin.digest) {
+                part.delete()
+                throw GradleException("${pin.url}: ${pin.algorithm} mismatch, expected ${pin.digest}, got $actual")
+            }
+            part.renameTo(target)
+        }
+    }
+}

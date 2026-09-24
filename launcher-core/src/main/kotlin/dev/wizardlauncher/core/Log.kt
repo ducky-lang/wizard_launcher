@@ -12,6 +12,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 object Log {
     private val listeners = CopyOnWriteArrayList<(String) -> Unit>()
+    private val lineListeners = CopyOnWriteArrayList<(String) -> Unit>()
+    private val recent = ArrayDeque<String>()
     private var writer: BufferedWriter? = null
     private val stamp = DateTimeFormatter.ofPattern("HH:mm:ss")
 
@@ -26,6 +28,11 @@ object Log {
 
     fun listen(listener: (String) -> Unit) { listeners += listener }
 
+    fun listenLines(listener: (String) -> Unit) { lineListeners += listener }
+
+    @Synchronized
+    fun recentLines(): List<String> = recent.toList()
+
     fun info(message: String) {
         val clean = Redactor.redact(message)
         file(clean)
@@ -35,6 +42,9 @@ object Log {
     @Synchronized
     fun file(message: String) {
         val line = "[${LocalDateTime.now().format(stamp)}] ${Redactor.redact(message)}"
+        recent.addLast(line)
+        while (recent.size > 2000) recent.removeFirst()
+        lineListeners.forEach { runCatching { it(line) } }
         val w = writer
         if (w == null) {
             System.err.println(line)

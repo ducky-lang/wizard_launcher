@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.wizardlauncher.legacypacks.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "PackCompatibilityMixin",
+    "PackRepositoryMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

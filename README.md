@@ -1,71 +1,147 @@
-# Wizard Launcher 2.0
+<div align="center">
 
-Launcher cho map **Witchcraft and Wizardry**: chạy world Minecraft **1.16.5** ngay trên máy người chơi và nối nó với client **1.20.1** (Fabric + Fabulously Optimized) chỉ bằng một nút Play.
+<img src="assets/floo-logo.png" alt="Wizard Launcher" width="132">
 
-Bản 2.0 viết lại toàn bộ bằng **Kotlin + Java** (bản 1.x là Python/Flet).
+# Wizard Launcher
 
-## Kiến trúc
+**The one-click portal to _Witchcraft & Wizardry_.**<br>
+A hand-built 1.16.5 castle, played on a modern 1.20.1 client, from a launcher that feels like a product rather than a script.
 
-```
-launcher-app     Kotlin · giao diện Swing + FlatLaf, CLI, đóng gói jpackage
-launcher-core    Kotlin · cài đặt, tải file an toàn, đăng nhập, chạy server/client
-pack-converter   Kotlin · chuyển resource pack 1.16.5 → 1.20.1 + DSL định nghĩa state
-server-host      Java   · 1 JVM chạy cả server 1.16.5 lẫn ViaProxy
-client-boot      Java   · khởi động Minecraft mà token không lộ trên command line
-```
+[![Build](https://github.com/ducky-lang/wizard_launcher/actions/workflows/build.yml/badge.svg)](https://github.com/ducky-lang/wizard_launcher/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/ducky-lang/wizard_launcher?color=f2c14e&label=release)](https://github.com/ducky-lang/wizard_launcher/releases/latest)
+![Platforms](https://img.shields.io/badge/platforms-Windows%20·%20macOS%20·%20Linux-8b7ae8)
+![Java](https://img.shields.io/badge/runtime-Java%2017%20bundled-5ee1c1)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20client%20·%201.16.5%20world-7de3b0)
 
-Bộ cài mang theo Java 17 (jlink). Chính runtime đó chạy launcher, client 1.20.1 và server 1.16.5, nên không bao giờ phải tải hay dò tìm Java.
+[**Download**](https://github.com/ducky-lang/wizard_launcher/releases/latest) ·
+[Features](#features) ·
+[How it works](#how-it-works) ·
+[Legacy packs](#native-legacy-resource-packs) ·
+[Security](#security) ·
+[Build](#building-from-source)
 
-## Server tốn ít RAM hơn
+</div>
 
-Bản 1.x chạy **2 JVM**: server và ViaProxy. Bản 2.0 dùng `server-host`: server vanilla được nạp vào một classloader cách ly (vì nó dùng Netty 4.1.25/Log4j 2.8), còn ViaProxy chạy ngay cạnh trong cùng JVM. Hai bên dùng chung heap, JIT và GC.
+---
 
-Kết quả đo thực tế với server 1.16.5 + ViaProxy đi kèm, cùng giới hạn heap 1 GB, lúc nhàn rỗi:
+## Highlights
 
-| Cấu hình | RSS |
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### Plays offline
+Once installed, **Play never touches the network**. Every install step is fingerprinted, so a warm launch does no downloads and no re-hashing. **Offline bundles** can move a whole install to a computer that has never been online.
+
+</td>
+<td width="33%" valign="top">
+
+### Half the memory
+The 1.16.5 world server and the ViaProxy version bridge share **one JVM**. With tuned G1 flags the heap grows only when the castle needs it and shrinks back afterwards. At idle this measured **~830 MB, down from ~1620 MB**.
+
+</td>
+<td width="33%" valign="top">
+
+### Old packs, read natively
+A bundled Fabric mod teaches Minecraft 1.20.1 to **read 1.13–1.19 resource packs directly**. There is no conversion step and no copy of the pack, and the original files are never modified.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### Chromium interface
+A fluid, animated UI rendered by an embedded Chromium engine (JCEF). It animates only GPU-friendly properties, pauses when hidden, and fully honours *reduced motion*.
+
+</td>
+<td valign="top">
+
+### Secure by default
+- Pinned hashes on every download, checked on each redirect hop.
+- The access token never appears on a command line.
+- Refresh tokens live in the OS keychain.
+- The Log4Shell fix the 1.16.5 server actually needs.
+- A UI engine that cannot reach the internet.
+
+</td>
+<td valign="top">
+
+### Everything in one place
+- Multiple accounts.
+- Mod, resource pack and shader manager.
+- Screenshot gallery.
+- World backups and restore.
+- Live console and crash assistant.
+- Tray mode, and English and Vietnamese.
+
+</td>
+</tr>
+</table>
+
+---
+
+## Features
+
+| Area | What you get |
 |---|---|
-| 1.x: 2 JVM, cờ JVM cũ | ~1620 MB |
-| 2.0: 1 JVM, cờ cũ | ~1408 MB |
-| **2.0: 1 JVM, cờ mới** (`JvmFlags.server`) | **~830 MB** |
+| **Play** | One button installs, repairs and launches. It shows staged progress (castle → game files → mods → portal → launch) with live speed. The world saves and stops by itself when Minecraft exits, even if the launcher was closed. |
+| **Accounts** | Microsoft sign-in with a device code, so your password is only typed on Microsoft's site. Offline players are also supported, and you can switch between several accounts with one click. Signed-in players keep playing when offline, using their saved profile. |
+| **Library** | Mods: enable, disable, add and remove, with modpack mods protected. Resource packs: enable, disable, add and remove, with 1.16.5 packs badged as *read natively* and an optional export to a 1.20.1 zip. Shader packs: add and remove. |
+| **Screenshots** | A gallery with thumbnails cached on disk, a lightbox with keyboard navigation, and open and delete actions. |
+| **World** | Size and last-played information, one-click backups, restore from any backup, and a reset that always backs up first. A **world self-test** boots the server, pings it as a 1.20.1 client, reports memory, then stops it and saves. |
+| **Console** | Live, filterable output from the launcher, world server and bridge, with copy and open-folder actions. |
+| **Crash assistant** | If Minecraft exits abnormally, the matching crash report is surfaced with a summary and a copy button. |
+| **Settings** | Memory profiles and sliders, window size, fullscreen, custom Java, offline mode, LAN play, launcher behaviour while playing (stay, tray, close), animations, hardware acceleration, and log retention. |
+| **Maintenance** | Repair game files (full hash verification), export and import offline bundles, block-state rules, and the data folder. |
+| **Shortcuts** | <kbd>Ctrl</kbd>+<kbd>Enter</kbd> plays · <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>6</kbd> switches pages · <kbd>Esc</kbd> closes dialogs · <kbd>←</kbd>/<kbd>→</kbd> browse screenshots |
 
-Các cờ mới cho heap co giãn theo nhu cầu (`-Xms` thấp, Min/MaxHeapFreeRatio, periodic GC của G1) thay vì chiếm sẵn cả heap như `-Xms=-Xmx` + AlwaysPreTouch trước đây. Chúng còn dùng string dedup, ít luồng JIT hơn và code cache nhỏ hơn. Heap mặc định cũng nhỏ lại, có 3 mức Low / Balanced / High, và mức Low giảm luôn view-distance. Server chỉ cần mạng loopback: đã tắt compression và native transport, và tắt kiểm tra cập nhật của ViaProxy (`-DskipUpdateCheck`).
+---
 
-Khi vừa khởi động xong, RSS cao hơn một chút (~1.1–1.2 GB) rồi mới co lại.
+## How it works
 
-Muốn tự kiểm tra trên máy mình: `WizardLauncher --world-selftest`, hoặc vào menu **Tools → Test the world server**. Lệnh này khởi động world, ping bằng protocol 1.20.1, báo RAM rồi tắt và lưu. Không cần internet.
-
-Chế độ 2 JVM cũ vẫn còn để dự phòng: đặt `"mode": "split"` trong catalog.
-
-## Chạy offline
-
-- Sau lần cài đầu, **Play không dùng mạng**. Mỗi bước cài có một "dấu vân tay" trong `install_state.json`; khớp là bỏ qua bước đó.
-- Server là world cục bộ ở offline-mode. Người đăng nhập Microsoft mà mất mạng vẫn chơi được bằng profile đã lưu (tên và UUID). Việc refresh token chỉ thử khi có mạng.
-- **Settings → Offline mode** cấm hoàn toàn mọi truy cập mạng.
-- Để cài cho máy chưa từng có mạng: trên máy đã cài, chọn **Tools → Export offline bundle** (hoặc `--export-bundle file.wizardpack`), rồi trên máy kia chọn **Import offline bundle** (hoặc `--import-bundle`). Bundle chứa manifest SHA-256 cho từng file. Chỉ cần một file sai hoặc một đường dẫn lạ là toàn bộ bundle bị từ chối và máy nhận không bị thay đổi gì. Bundle không mang theo save, settings hay token.
-- Server tự tắt và lưu world khi Minecraft thoát (nó theo dõi PID của client). Vì vậy có thể đóng launcher trong lúc chơi mà không cần tiến trình watchdog riêng.
-
-## Resource pack 1.16.5 trên 1.20.1
-
-Pack được viết cho 1.16.5 (`pack_format` 6). Launcher tự chuyển nó sang 1.20.1 (`pack_format` 15) trước khi bật, và ghi báo cáo vào `logs/resource-pack-conversion.txt`. Cũng có thể dùng converter riêng:
-
+```mermaid
+flowchart LR
+    subgraph Launcher["Wizard Launcher (Java 17, bundled)"]
+        UI["Chromium UI<br/>(JCEF, offline origin)"] -- "JSON bridge" --> Core["launcher-core<br/>install · accounts · processes"]
+    end
+    Core -- "stdin (no token on the command line)" --> Boot["client-boot"] --> MC["Minecraft 1.20.1<br/>Fabric + Fabulously Optimized<br/>+ Wizard Legacy Packs"]
+    Core -- "stop / watch PID" --> Host
+    subgraph Host["One JVM: server-host"]
+        Via["ViaProxy<br/>1.20.1 ⇄ 1.16.5"] --> Server["Vanilla 1.16.5 server<br/>(isolated class loader)"]
+    end
+    MC -- "127.0.0.1" --> Via
 ```
-WizardLauncher --convert-pack "Pack 1.16.5.zip" "Pack 1.20.1.zip" [--rules wizard-states.json]
-```
 
-Hoặc trong app: **Tools → Convert a 1.16.5 resource pack**.
+| Module | Language | Role |
+|---|---|---|
+| `launcher-app` | Kotlin | JCEF window, UI bridge, tray, CLI, classic Swing fallback, jpackage images |
+| `launcher-core` | Kotlin | Offline-first installers, Microsoft auth, secret storage, process supervision, library services |
+| `server-host` | Java | Runs the 1.16.5 server and ViaProxy side by side in one JVM, and saves on exit |
+| `client-boot` | Java | Receives the game arguments over stdin and starts Minecraft |
+| `pack-legacy` | Java | The translation engine for older resource packs, shared by the mod and the export tool |
+| `legacy-mod` | Java (Fabric) | Serves older packs to 1.20.1 through a translating resource layer |
 
-| Thay đổi của game từ 1.16.5 đến 1.20.1 | Converter xử lý thế nào |
+The installer carries its own Java 17 runtime. That single runtime runs the launcher, the client and the world server, so there is no Java to download, find or configure.
+
+---
+
+## Native legacy resource packs
+
+The castle's resource pack was made for **1.16.5** (`pack_format` 6). Instead of converting it, the bundled **Wizard Legacy Packs** mod reads it directly. When Minecraft opens the selected packs, each older pack is wrapped in a layer that answers the game's resource requests the way a 1.20.1 pack would. The files on disk stay exactly as they are.
+
+| What 1.20.1 changed | How the pack is read |
 |---|---|
-| 1.19.3: atlas chỉ còn tự gom `block/` và `item/`, nên model dùng texture ở thư mục khác sẽ hiện ô tím-đen | Sinh `atlases/blocks.json`: thêm directory source cho thư mục tùy biến, single source cho texture vanilla khác |
-| 1.17: `grass_path` → `dirt_path`, squid chuyển thư mục; 1.19.4: glint tách đôi | Copy file và sửa các tham chiếu |
-| 1.17: `cauldron` tách thành `cauldron` + `water_cauldron` | Tách blockstate theo `level`, đổi model `cauldron_levelN` sang tên mới |
-| 1.20: xoá font provider `legacy_unicode`. Pack 1.16 hay override `unicode_page_XX.png` làm GUI/icon | Đổi mỗi trang override thành provider `bitmap`: cắt glyph theo `glyph_sizes.bin`, glyph trống có độ rộng thành `space` |
-| 1.17: post shader bắt buộc GLSL 150 core | Nâng `#version`, `attribute/varying`, `gl_FragColor`, `texture2D` |
-| `pack_format` 6 bị báo "incompatible" | Ghi lại thành 15 |
+| 1.19.3 stitches only `block/` and `item/` textures into the block atlas | An `atlases/blocks.json` is generated for every other texture that models use |
+| `grass_path` became `dirt_path`; squid, cauldron and glint textures moved (1.17–1.19.4) | Aliases and reference rewrites; the cauldron's `level` states are split into `cauldron` and `water_cauldron` |
+| 1.20 removed the `legacy_unicode` font provider (custom GUI glyphs) | Pages become `bitmap` providers cropped by `glyph_sizes.bin`; blank sized glyphs become `space` advances |
+| 1.17 post shaders require GLSL 150 | `attribute`/`varying`, `gl_FragColor` and `texture2D` are upgraded |
+| Older `pack_format` is flagged *incompatible* | The pack is listed as compatible |
 
-### Định nghĩa state (`wizard-states.json`)
+Any pack from **1.13 to 1.19.4** benefits, with rules gated by the version each change arrived in. A report for every pack is written to `logs/wizard-legacy-packs/`.
 
-Các luật được áp theo thứ tự: bảng dựng sẵn 1.16.5→1.20.1, rồi `wizard-states.json` ở gốc pack, rồi `wizard-states.json` trong thư mục dữ liệu launcher (mở qua **Tools → Edit block state rules**).
+### Defining block states
+
+Packs, or you, can declare extra rules in `wizard-states.json`. Put it in the pack root, or open it from **Settings → Maintenance → Block state rules**:
 
 ```json
 {
@@ -76,68 +152,124 @@ Các luật được áp theo thứ tự: bảng dựng sẵn 1.16.5→1.20.1, r
     }
   },
   "items": {
-    "minecraft:stick": [ { "predicate": { "custom_model_data": 1001 }, "model": "wizard:item/wand" } ]
+    "minecraft:stick": [
+      { "predicate": { "custom_model_data": 1001 }, "model": "wizard:item/wand" }
+    ]
   },
   "split_blockstates": [
     { "from": "minecraft:cauldron", "when": { "level": "1|2|3" }, "to": "minecraft:water_cauldron" }
   ],
-  "rename_references": { "models": { "ns:cu": "ns:moi" }, "textures": {} },
-  "copy_files": [ { "from": "assets/...", "to": "assets/..." } ],
-  "lang_keys": { "key.cu": "key.moi" }
+  "rename_references": { "models": {}, "textures": {} },
+  "copy_files": [],
+  "lang_keys": {}
 }
 ```
 
-- `states`: thêm hoặc ghi đè variant (model) cho từng block state. Dùng được cho cả blockstate dạng variants lẫn multipart.
-- `items`: override `custom_model_data` hoặc predicate bất kỳ. Tự sắp theo thứ tự tăng dần, vì Minecraft lấy override khớp cuối cùng.
-- `split_blockstates`, `rename_references`, `copy_files`, `lang_keys`: dùng cho các thay đổi giữa phiên bản mà bảng dựng sẵn chưa có.
+**Known limits:**
+- Features specific to OptiFine depend on client mods.
+- Shaders built on fixed-function GLSL cannot be translated.
+- The 1.20 smithing GUI has a different layout.
+- Every case that cannot be translated is listed in the pack report.
 
-**Giới hạn còn lại** (converter không tự dịch được, đều ghi vào báo cáo):
+---
 
-- Tính năng riêng của OptiFine (CIT/CTM/sky) phụ thuộc vào mod client.
-- Shader dùng hàm fixed-function.
-- GUI `smithing.png` đã đổi bố cục trong 1.20.
-- Glyph unicode có độ rộng lẻ có thể lệch khoảng cách tối đa 1px.
+## Security
 
-## Bảo mật
+| | |
+|---|---|
+| **Downloads** | HTTPS with TLS 1.2 or later. Each purpose (Mojang/Fabric, Modrinth, map host) has its own host allow-list, checked on every redirect hop. Files are verified against SHA-1, SHA-256 or SHA-512 digests before they appear, with size caps and atomic writes. |
+| **Archives** | Zip-slip and zip-bomb protection; staged extraction that is swapped in only when complete. |
+| **Catalog** | A replacement catalog is accepted only with a valid Ed25519 signature from the key compiled into the build. |
+| **Tokens** | The Minecraft access token exists only in memory and reaches the game over a pipe, never on the command line (a test enforces this). The Microsoft refresh token is stored with DPAPI, the macOS Keychain or the Secret Service, falling back to AES-GCM. Logs redact tokens. |
+| **World server** | Loopback only; RCON, query and JMX are off; a whitelist is bound to the player's offline UUID. The 1.16.5 server ships Log4j 2.8.1, where `formatMsgNoLookups` does nothing, so it runs with Mojang's `%msg{nolookups}` configuration plus JNDI and RMI hardening. Its JVM cannot open outbound URL connections at all. |
+| **UI engine** | Pages are served from a private `https://wizard-launcher.invalid` origin with a strict Content-Security-Policy. Chromium runs with no proxy and a resolver that maps every hostname to *not found*, so the interface cannot contact the internet. External links open in your own browser. |
+| **Game files** | Bundled `server.jar` and `ViaProxy.jar` are pinned by hash. A full **Repair** re-verifies every library and asset. |
+| **Processes** | Identified by PID *and* start time, so a recycled PID is never mistaken for one of ours. |
 
-- **Tải file:** chỉ HTTPS, TLS 1.2+. Redirect được tự theo từng bước và mỗi bước đều kiểm tra allow-list domain riêng cho từng loại nội dung (Mojang/Fabric, Modrinth, Hugging Face). File chỉ xuất hiện sau khi hash khớp: SHA-1 của Mojang, SHA-512 của Modrinth, SHA-256 trong catalog. Có giới hạn kích thước, và ghi file theo kiểu atomic.
-- **Zip:** chặn Zip Slip, chặn zip bomb, và giải nén vào thư mục tạm rồi mới đổi chỗ.
-- **Catalog đã ký:** có thể thay `catalog.json` bằng bản mới đặt trong thư mục dữ liệu, nhưng chỉ khi có chữ ký Ed25519 (`catalog.json.sig`) khớp khóa công khai đi kèm bản build. Dùng `--catalog-keygen` và `--catalog-sign` để tạo khóa và ký.
-- **Token:**
-  - Refresh token lưu bằng DPAPI (Windows), Keychain (macOS) hoặc Secret Service (Linux). Nếu không có các dịch vụ đó thì dùng file AES-GCM kèm khóa 0600.
-  - Access token chỉ nằm trong RAM. Nó được truyền cho Minecraft qua stdin nhờ `client-boot`, nên **không xuất hiện trên command line** (có test kiểm chứng).
-  - Log luôn che token.
-- **Jar đi kèm:** `server.jar` và `ViaProxy.jar` được so SHA-256 với catalog trước khi chạy.
-- **Server:**
-  - Chỉ nghe trên loopback. RCON, query và JMX đều tắt.
-  - Bật whitelist theo UUID offline của người chơi. Khi bật LAN thì whitelist tắt, và chỉ bridge được mở ra mạng LAN.
-  - Port mặc định bị chiếm thì tự chọn port trống.
-- **Log4Shell:** `server.jar` vanilla 1.16.5 dùng Log4j 2.8.1. Với phiên bản này, cờ `-Dlog4j2.formatMsgNoLookups=true` mà bản 1.x dùng **không có tác dụng**. Bản 2.0 dùng cấu hình `%msg{nolookups}` (cách Mojang tự vá cho 1.12–1.16.5) và thêm các cờ JNDI/RMI hardening.
-- **Tiến trình:** nhận diện bằng PID kết hợp thời điểm khởi động, nên không bao giờ kill nhầm tiến trình lạ có PID trùng. Chỉ chạy một launcher tại một thời điểm.
+---
 
-## Build
+## Offline play
 
-Cần JDK 17 trở lên.
+- The first launch downloads the castle, Minecraft 1.20.1, Fabric and the modpack once. After that, **Play works with the network cable unplugged**.
+- **Settings → Offline mode** forbids all network access.
+- **Export offline bundle** packs the game, libraries, assets, mods and cached content into one `.wizardpack`. **Import offline bundle** installs it on another computer. Bundles are verified file by file, and a damaged or tampered bundle changes nothing.
+- A Microsoft account keeps working offline with its saved profile, because the local world server does not check tokens.
 
-```
-./gradlew build                                   # compile + toàn bộ test
-./gradlew :launcher-app:run                       # chạy thử
-./gradlew :launcher-app:jpackage                  # app-image (kèm Java runtime)
-./gradlew :launcher-app:jpackage -PjpackageType=dmg   # macOS
-```
+---
 
-Bộ cài Windows dùng `installer/WizardLauncher.iss` (Inno Setup) với app-image làm đầu vào. CI (`.github/workflows/build.yml`) chạy test ở mọi push, và build bộ cài cho cả 3 hệ điều hành khi có tag `v*.*.*`.
+## Installing
 
-Đăng nhập Microsoft cần Azure client id (public). Cung cấp nó qua biến `MC_LAUNCHER_CLIENT_ID` lúc build, hoặc secret cùng tên trên GitHub. Nếu không có, người chơi dùng tên offline.
+Download the installer for your system from the [latest release](https://github.com/ducky-lang/wizard_launcher/releases/latest):
 
-## Dữ liệu
+| System | File |
+|---|---|
+| Windows 10/11 (64-bit) | `WizardLauncher-Windows-Setup-<version>.exe` (per-user install, no admin prompt) |
+| macOS (Apple silicon) | `WizardLauncher-macOS.dmg` |
+| Linux (x86_64) | `WizardLauncher-Linux-x86_64.AppImage` |
 
-Vị trí thư mục dữ liệu giống bản 1.x, nên world và progress cũ được giữ nguyên:
+Verify the file against `SHA256SUMS.txt`.
 
+Your world, settings and logs live in the data folder, and uninstalling never deletes them unless you ask:
 - Windows: `%LOCALAPPDATA%\WizardLauncher`
 - macOS: `~/Library/Application Support/WizardLauncher`
 - Linux: `$XDG_DATA_HOME/WizardLauncher`
 
-Biến `WIZARD_LAUNCHER_DATA` dùng để đổi thư mục này, tiện khi test hoặc làm bản portable.
+---
 
-Created by Foxy (.phungminh)
+## Command line
+
+```text
+WizardLauncher                                   open the launcher
+WizardLauncher --classic                         open the lightweight Swing interface
+WizardLauncher --play [--name <player>]          install if needed and play, no window
+WizardLauncher --verify-install                  install or repair the game and check every file
+WizardLauncher --world-selftest                  start the world and bridge, ping as 1.20.1, stop
+WizardLauncher --smoke-client [--pack p.zip]     start Minecraft briefly and check it loads
+WizardLauncher --export-pack <in> <out.zip>      write a 1.20.1-format copy of an older pack
+WizardLauncher --export-bundle <file>            pack this install for an offline computer
+WizardLauncher --import-bundle <file>            install from an offline bundle
+WizardLauncher --catalog-keygen | --catalog-sign <catalog.json>
+```
+
+`WIZARD_LAUNCHER_DATA` points the launcher at another data folder, which is useful for portable installs and testing.
+
+---
+
+## Building from source
+
+You need JDK 17 or newer.
+
+```bash
+./gradlew build                                   # compile and run every test
+./gradlew fetchGameJars                           # download and verify the pinned server and bridge jars
+./gradlew -p legacy-mod build                     # build the Fabric legacy-pack mod
+./gradlew :launcher-app:run                       # run from source
+./gradlew :launcher-app:jpackage                  # self-contained app image for this OS
+./gradlew :launcher-app:jpackage -PjpackageType=dmg
+```
+
+CI (`.github/workflows/build.yml`) does the following:
+- Runs the tests.
+- Builds the mod.
+- **Installs the real game on Windows, macOS and Linux**.
+- Starts Minecraft 1.20.1 with a generated 1.16.5 pack under a virtual display.
+- Builds installers for all three platforms, with SHA-256 checksums.
+
+Running the workflow manually, or pushing a `v*.*.*` tag, publishes a release.
+
+Microsoft sign-in needs a public Azure application id, passed as the `MC_LAUNCHER_CLIENT_ID` environment variable or repository secret. Without it, players use offline names.
+
+---
+
+## Credits
+
+- **Map:** *Witchcraft and Wizardry* by [The Floo Network](https://www.thefloonetwork.net/).
+- **Launcher:** Foxy (.phungminh).
+- **Built on:**
+  - [Fabric](https://fabricmc.net/)
+  - [Fabulously Optimized](https://modrinth.com/modpack/fabulously-optimized)
+  - [ViaProxy](https://github.com/ViaVersion/ViaProxy)
+  - [JCEF](https://github.com/chromiumembedded/java-cef) via [jcefmaven](https://github.com/jcefmaven/jcefmaven)
+  - [FlatLaf](https://www.formdev.com/flatlaf/)
+
+Minecraft is a trademark of Mojang Studios. This project is not affiliated with Mojang or Microsoft.

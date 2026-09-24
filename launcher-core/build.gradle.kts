@@ -8,7 +8,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-dependencies { implementation(project(":pack-converter")) }
+dependencies { implementation(project(":pack-legacy")) }
 
 tasks.processResources {
     val props = mapOf(

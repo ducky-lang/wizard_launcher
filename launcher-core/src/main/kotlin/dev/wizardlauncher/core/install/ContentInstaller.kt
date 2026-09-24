@@ -6,8 +6,7 @@ import dev.wizardlauncher.core.LauncherException
 import dev.wizardlauncher.core.Log
 import dev.wizardlauncher.core.net.SecureDownloader
 import dev.wizardlauncher.core.security.Checksum
-import dev.wizardlauncher.pack.PackConverter
-import dev.wizardlauncher.pack.VanillaAssets
+import dev.wizardlauncher.core.security.Hashes
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -51,37 +50,49 @@ class ContentInstaller(
         return dir
     }
 
-    fun ensureResourcePack(convert: Boolean): String {
+    fun ensureResourcePack(): String {
         val resource = catalog.resource("resource_pack")
-        val needsConversion = convert && resource.convertFrom != null && resource.convertFrom < PackConverter.TARGET_FORMAT
-        val name = if (needsConversion) "${resource.name} (1.20.1).zip" else resource.name
+        val name = resource.name
         val target = paths.gameDir.resolve("resourcepacks").resolve(name)
-        val rulesFile = paths.root.resolve("wizard-states.json")
-        val wanted = InstallState.fingerprint(resource.url, resource.sha256, needsConversion, CONVERTER_REVISION,
-            if (Files.isRegularFile(rulesFile)) Files.getLastModifiedTime(rulesFile).toMillis() else 0)
-        if (state.matches("resourcepack", wanted) && Files.exists(target)) return name
-
+        val wanted = InstallState.fingerprint(resource.url, resource.sha256, "native")
+        Files.deleteIfExists(paths.gameDir.resolve("resourcepacks").resolve("$name (1.20.1).zip"))
+        if (state.matches("resourcepack", wanted) && Files.isRegularFile(target.resolve("pack.mcmeta"))) return name
         val source = fetch(resource)
+        progress.update(null, "Installing ${resource.name}...")
         Files.createDirectories(target.parent)
-        if (needsConversion) {
-            progress.update(null, "Converting the resource pack for 1.20.1...")
-            val vanillaJar = paths.versions.resolve(catalog.minecraft.clientVersion).resolve("${catalog.minecraft.clientVersion}.jar")
-            val vanilla = if (Files.isRegularFile(vanillaJar)) VanillaAssets.fromClientJar(vanillaJar) else null
-            val report = PackConverter(vanilla, Log::file).convert(source, target,
-                listOfNotNull(rulesFile.takeIf(Files::isRegularFile)))
-            Files.writeString(paths.logs.resolve("resource-pack-conversion.txt"), report.render())
-            Log.info("Resource pack converted for 1.20.1 (${report.filesRewritten} files adapted, " +
-                "${report.warnings.size} note(s) in logs/resource-pack-conversion.txt).")
-        } else {
-            SafeZip.deleteTree(target)
-            SafeZip.copyTree(source, target)
-        }
+        val staging = target.resolveSibling("$name.installing")
+        SafeZip.deleteTree(staging)
+        SafeZip.copyTree(source, staging)
+        SafeZip.deleteTree(target)
+        Files.move(staging, target)
         state.mark("resourcepack", wanted)
         return name
     }
 
+    fun ensureLegacyPackSupport() {
+        val bundled = paths.resources.resolve("mods").resolve(LEGACY_MOD)
+        val target = paths.gameDir.resolve("mods").resolve(LEGACY_MOD)
+        if (!Files.isRegularFile(bundled)) {
+            Log.info("Legacy pack support is not part of this build; older resource packs may not display correctly.")
+            return
+        }
+        if (!Files.isRegularFile(target) || Files.size(target) != Files.size(bundled) ||
+            Hashes.of(target, "SHA-256") != Hashes.of(bundled, "SHA-256")) {
+            Files.createDirectories(target.parent)
+            Files.copy(bundled, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        }
+        val rules = paths.root.resolve("wizard-states.json")
+        val configRules = paths.gameDir.resolve("config").resolve("wizard-states.json")
+        if (Files.isRegularFile(rules)) {
+            Files.createDirectories(configRules.parent)
+            Files.copy(rules, configRules, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        } else {
+            Files.deleteIfExists(configRules)
+        }
+    }
+
     companion object {
-        const val CONVERTER_REVISION = 1
+        const val LEGACY_MOD = "wizard-legacy-packs.jar"
 
         fun requireSpace(paths: AppPaths, mb: Int) {
             val free = runCatching { Files.getFileStore(paths.root).usableSpace / (1024 * 1024) }.getOrDefault(Long.MAX_VALUE)

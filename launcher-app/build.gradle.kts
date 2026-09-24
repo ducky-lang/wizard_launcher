@@ -3,15 +3,37 @@ plugins {
     application
 }
 
+val jcefNatives: String = run {
+    val os = org.gradle.internal.os.OperatingSystem.current()
+    val arch = if (System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")) "arm64" else "amd64"
+    when {
+        os.isWindows -> "windows-$arch"
+        os.isMacOsX -> "macosx-$arch"
+        else -> "linux-$arch"
+    }
+}
+
 dependencies {
     implementation(project(":launcher-core"))
-    implementation(project(":pack-converter"))
+    implementation(project(":pack-legacy"))
+    implementation("com.google.code.gson:gson:2.11.0")
     implementation("com.formdev:flatlaf:3.5.2")
+    implementation("me.friwi:jcefmaven:146.0.10")
+    runtimeOnly("me.friwi:jcef-natives-$jcefNatives:jcef-d3de827+cef-146.0.10+g8219561+chromium-146.0.7680.179")
 }
+
+val uiJvmArgs = listOf(
+    "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
+    "--add-opens=java.desktop/java.awt.peer=ALL-UNNAMED",
+    "--add-opens=java.desktop/sun.lwawt=ALL-UNNAMED",
+    "--add-opens=java.desktop/sun.lwawt.macosx=ALL-UNNAMED",
+    "--add-exports=java.desktop/sun.awt=ALL-UNNAMED",
+)
 
 application {
     mainClass.set("dev.wizardlauncher.app.MainKt")
     applicationName = "WizardLauncher"
+    applicationDefaultJvmArgs = listOf("-Xmx512m") + uiJvmArgs
 }
 
 tasks.jar {
@@ -27,21 +49,35 @@ val helperJars = files(
     project(":client-boot").tasks.named("jar"),
 )
 
+val legacyModJar = rootProject.file("legacy-mod/build/libs/wizard-legacy-packs.jar")
+
+val stageResources = tasks.register<Sync>("stageResources") {
+    mustRunAfter(":fetchGameJars")
+    from(rootProject.file("resources"))
+    from(rootProject.layout.buildDirectory.dir("bundled"))
+    from(legacyModJar) { into("mods") }
+    into(layout.buildDirectory.dir("staged-resources"))
+}
+
 distributions {
     main {
         contents {
             into("lib") { from(helperJars) }
-
-            into("resources") {
-                from(rootProject.file("resources"))
-            }
+            into("resources") { from(stageResources) }
         }
     }
 }
 
+tasks.processResources {
+    from(rootProject.file("assets/floo-logo.png")) {
+        into("dev/wizardlauncher/app")
+        rename { "logo.png" }
+    }
+}
+
 tasks.named<JavaExec>("run") {
-    dependsOn(":server-host:jar", ":client-boot:jar")
-    systemProperty("wizard.resources", rootProject.file("resources").absolutePath)
+    dependsOn(":server-host:jar", ":client-boot:jar", stageResources)
+    systemProperty("wizard.resources", layout.buildDirectory.dir("staged-resources").get().asFile.absolutePath)
     systemProperty("wizard.tools", layout.buildDirectory.dir("helper-jars").get().asFile.absolutePath)
     doFirst {
         copy { from(helperJars); into(layout.buildDirectory.dir("helper-jars")) }
@@ -50,13 +86,13 @@ tasks.named<JavaExec>("run") {
 
 tasks.register<Exec>("jpackage") {
     group = "distribution"
-    dependsOn("installDist", ":makeIcons")
+    dependsOn("installDist", ":makeIcons", stageResources)
     val type = (findProperty("jpackageType") ?: "app-image").toString()
     val input = layout.buildDirectory.dir("install/WizardLauncher/lib").get().asFile
     val out = layout.buildDirectory.dir("jpackage").get().asFile
     doFirst {
         delete(out)
-        copy { from(rootProject.file("resources")); into(File(input, "resources")) }
+        copy { from(layout.buildDirectory.dir("staged-resources")); into(File(input, "resources")) }
     }
     val os = org.gradle.internal.os.OperatingSystem.current()
     val icon = when {
@@ -78,7 +114,6 @@ tasks.register<Exec>("jpackage") {
 
         "--add-modules", "java.se,jdk.unsupported,jdk.crypto.ec,jdk.zipfs,jdk.management,jdk.charsets,jdk.localedata,jdk.net,jdk.naming.dns,jdk.accessibility,jdk.httpserver,jdk.jfr",
         "--jlink-options", "--strip-debug --no-man-pages --no-header-files",
-        "--java-options", "-Xmx512m -XX:+UseSerialGC",
         if (icon.exists()) "--icon" else null, if (icon.exists()) icon.absolutePath else null,
-    ))
+    ) + (listOf("-Xmx512m", "-XX:+UseSerialGC") + uiJvmArgs).flatMap { listOf("--java-options", it) })
 }

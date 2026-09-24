@@ -21,11 +21,18 @@ class ClientRunner(
     private val javaExe: Path,
     private val bootJar: Path,
 ) {
-    fun launch(profile: VersionProfile, account: Account, joinAddress: String): Process {
-        val classpath = (profile.libraries.map { paths.libraries.resolve(it.path) } + profile.clientJar + bootJar)
-        classpath.firstOrNull { !Files.isRegularFile(it) }?.let {
-            throw LauncherException("A game file is missing:\n$it\n\nConnect to the internet once and press Play to repair the install.")
+    class Plan(val command: List<String>, val mainClass: String, val gameArgs: List<String>)
+
+    fun plan(profile: VersionProfile, account: Account, joinAddress: String?): Plan {
+        val classpath: List<Path> = profile.libraries.map { paths.libraries.resolve(it.path) } + listOf(profile.clientJar, bootJar)
+        val missing = classpath.filterNot(Files::isRegularFile)
+        if (missing.isNotEmpty()) {
+            Log.file("Missing classpath entries: " + missing.joinToString())
+            throw LauncherException("${missing.size} game file(s) are missing, for example:\n${missing.first().toAbsolutePath()}\n\n" +
+                "Press Play again with an internet connection to repair the install, or use Tools > Repair game files.")
         }
+        val width = settings.gameWidth
+        val height = settings.gameHeight
         val vars = mapOf(
             "auth_player_name" to account.name,
             "version_name" to profile.id,
@@ -44,20 +51,31 @@ class ClientRunner(
             "classpath" to classpath.joinToString(File.pathSeparator),
             "classpath_separator" to File.pathSeparator,
             "library_directory" to paths.libraries.toString(),
-            "quickPlayMultiplayer" to joinAddress,
+            "quickPlayMultiplayer" to (joinAddress ?: ""),
+            "resolution_width" to width.toString(),
+            "resolution_height" to height.toString(),
         )
-        val features = mapOf("is_quick_play_multiplayer" to true)
+        val features = mapOf("is_quick_play_multiplayer" to (joinAddress != null), "has_custom_resolution" to (width > 0 && height > 0))
         val jvm = expand(profile.jvmArgs, vars, features)
         val game = expand(profile.gameArgs, vars, features)
-
         val command = ArrayList<String>()
         command += javaExe.toString()
         command += JvmFlags.client(settings.effectiveClientRamMb)
+        command += "-Djava.awt.headless=true"
         command += jvm
         command += "dev.wizardlauncher.boot.SecureBoot"
+        return Plan(command, profile.mainClass, game)
+    }
 
+    fun command(profile: VersionProfile, account: Account, joinAddress: String?): List<String> =
+        plan(profile, account, joinAddress).command
+
+    fun launch(profile: VersionProfile, account: Account, joinAddress: String?): Process {
+        val plan = plan(profile, account, joinAddress)
+        val command = plan.command
+        val game = plan.gameArgs
+        GameOptions.setFullscreen(paths.gameDir.resolve("options.txt"), settings.fullscreen)
         Log.file("Client command: " + command.joinToString(" ") { if (it.length > 300) it.take(80) + "...(${it.length} chars)" else it })
-
         val output = paths.logs.resolve("client-output.log").toFile()
         val process = ProcessBuilder(command)
             .directory(paths.gameDir.toFile())
@@ -67,7 +85,7 @@ class ClientRunner(
         process.outputStream.bufferedWriter().let { w ->
             val b64 = Base64.getEncoder()
             w.write("WIZARD-BOOT/1\n")
-            w.write(b64.encodeToString(profile.mainClass.toByteArray()) + "\n")
+            w.write(b64.encodeToString(plan.mainClass.toByteArray()) + "\n")
             w.write("${game.size}\n")
             game.forEach { w.write(b64.encodeToString(it.toByteArray()) + "\n") }
             w.flush()

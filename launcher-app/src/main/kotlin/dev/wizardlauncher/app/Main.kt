@@ -1,13 +1,14 @@
 package dev.wizardlauncher.app
 
 import dev.wizardlauncher.core.AppPaths
+import dev.wizardlauncher.app.ui.WebApp
 import dev.wizardlauncher.core.BuildInfo
 import dev.wizardlauncher.core.Launcher
 import dev.wizardlauncher.core.LauncherException
 import dev.wizardlauncher.core.auth.Account
 import dev.wizardlauncher.core.install.OfflineBundle
 import dev.wizardlauncher.core.install.Progress
-import dev.wizardlauncher.pack.PackConverter
+import dev.wizardlauncher.legacy.PackExporter
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
 import java.nio.file.Files
@@ -36,7 +37,6 @@ fun main(args: Array<String>) {
             "Wizard Launcher", JOptionPane.INFORMATION_MESSAGE)
         return
     }
-    Theme.install()
     val launcher = try {
         Launcher(paths)
     } catch (t: Throwable) {
@@ -46,6 +46,15 @@ fun main(args: Array<String>) {
     Thread.setDefaultUncaughtExceptionHandler { thread, e ->
         dev.wizardlauncher.core.Log.error("Unhandled error in ${thread.name}: ${e.message}", e)
     }
+    if ("--classic" !in args && System.getProperty("wizard.classicUi") != "true") {
+        try {
+            WebApp(launcher).start()
+            return
+        } catch (t: Throwable) {
+            dev.wizardlauncher.core.Log.error("The web interface could not start (${t.message}); using the classic window.", t)
+        }
+    }
+    Theme.install()
     SwingUtilities.invokeLater { MainWindow(launcher).isVisible = true }
 }
 
@@ -54,11 +63,19 @@ private fun runCli(args: Array<String>): Boolean {
     when (args[0]) {
         "--version" -> println("Wizard Launcher ${BuildInfo.version}")
         "--help" -> println(HELP)
-        "--convert-pack" -> {
+        "--convert-pack", "--export-pack" -> {
             require(args.size >= 3) { HELP }
-            val rules = args.drop(3).windowed(2, 2).filter { it[0] == "--rules" }.map { Path.of(it[1]) }
-            val report = PackConverter(null, ::println).convert(Path.of(args[1]), Path.of(args[2]), rules)
-            println(report.render())
+            val rules = args.drop(3).windowed(2, 2).filter { it[0] == "--rules" }.map { Files.readString(Path.of(it[1])) }
+            val overlay = PackExporter.export(Path.of(args[1]), Path.of(args[2]), rules, null)
+            println(overlay.report())
+        }
+        "--verify-install" -> println(Launcher().verifyInstall(progress))
+        "--smoke-client" -> {
+            val timeout = args.getOrNull(args.indexOf("--timeout") + 1)?.takeIf { "--timeout" in args }?.toLong() ?: 240
+            val pack = args.getOrNull(args.indexOf("--pack") + 1)?.takeIf { "--pack" in args }?.let(Path::of)
+            val report = Launcher().smokeClient(progress, timeout, pack)
+            println(report)
+            if (report.lines().any { it.startsWith("[--]") }) exitProcess(3)
         }
         "--world-selftest" -> println(Launcher().selfTestWorld(progress))
         "--export-bundle" -> OfflineBundle.export(AppPaths.default().ensure(), Path.of(args[1]), progress)
@@ -95,8 +112,10 @@ private val HELP = """
     Wizard Launcher ${BuildInfo.version}
       (no arguments)                         open the launcher
       --play [--name <player>]               install if needed and play, no window
-      --convert-pack <in> <out.zip> [--rules states.json]...
-                                             convert a 1.16.5 resource pack for 1.20.1
+      --export-pack <in> <out.zip> [--rules states.json]...
+                                             write a 1.20.1-format copy of an older pack
+      --verify-install                       install or repair the game and check every file
+      --smoke-client [--pack p.zip] [--timeout s]   start Minecraft briefly and check it loads
       --world-selftest                       start the world + bridge, ping it as 1.20.1, stop (offline)
       --export-bundle <file.wizardpack>      pack this install for an offline computer
       --import-bundle <file.wizardpack>      install from a bundle, no internet needed

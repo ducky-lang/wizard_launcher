@@ -30,8 +30,14 @@ class ModpackInstaller(
         val manifest = Json.read(manifestFile)?.takeIf { it.isJsonObject }?.asJsonObject ?: return false
         if (manifest.get("fingerprint")?.asString != fingerprint()) return false
         val files = manifest.getAsJsonArray("files") ?: return false
-        return files.all { Files.isRegularFile(paths.gameDir.resolve(it.asString)) }
+        return files.all { present(it.asString) }
     }
+
+    private fun present(rel: String) =
+        Files.isRegularFile(paths.gameDir.resolve(rel)) || Files.isRegularFile(paths.gameDir.resolve("$rel.disabled"))
+
+    fun managedFiles(): Set<String> =
+        Json.read(manifestFile)?.takeIf { it.isJsonObject }?.asJsonObject?.getAsJsonArray("files")?.map { it.asString }?.toSet() ?: emptySet()
 
     fun loaderVersion(): String {
         Json.read(manifestFile)?.asJsonObject?.get("fabric_loader")?.asString?.let { return it }
@@ -76,7 +82,9 @@ class ModpackInstaller(
             val sha512 = f.getAsJsonObject("hashes")?.get("sha512")?.asString
                 ?: throw LauncherException("Modpack entry $rel has no SHA-512 and was refused.")
             progress.update(i.toDouble() / files.size, "${pack.name}  ·  ${i + 1} of ${files.size}  ·  ${rel.substringAfterLast('/')}")
-            downloader.download(url, paths.gameDir.resolve(rel), Checksum.sha512(sha512), maxBytes = 256L shl 20, resume = false)
+            if (!Files.isRegularFile(paths.gameDir.resolve("$rel.disabled"))) {
+                downloader.download(url, paths.gameDir.resolve(rel), Checksum.sha512(sha512), maxBytes = 256L shl 20, resume = false)
+            }
             installed += rel
         }
 
