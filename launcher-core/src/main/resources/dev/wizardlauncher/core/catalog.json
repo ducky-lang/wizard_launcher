@@ -1,0 +1,91 @@
+{
+  "schema_version": 2,
+  "minecraft": {
+    "client_version": "1.20.1",
+    "server_version": "1.16.5",
+    "fabric_loader_fallback": "0.15.11",
+    "required_java_major": 17
+  },
+  "server": {
+    "mode": "hosted",
+    "port": 25565,
+    "proxy_port": 25566,
+    "entry_name": "Witchcraft and Wizardry",
+    "server_jar": {
+      "path": "servers/1.16.5/server.jar",
+      "sha256": "58f329c7d2696526f948470aa6fd0b45545039b64cb75015e64c12194b373da6"
+    },
+    "proxy_jar": {
+      "path": "proxy/ViaProxy.jar",
+      "sha256": "32ce9ad871aeb03286823c29da262ebd75992864e7857db283f103525c7fc0cb"
+    },
+    "properties": {
+      "allow-flight": "true",
+      "enable-command-block": "true",
+      "op-permission-level": "4",
+      "function-permission-level": "2",
+      "spawn-protection": "0",
+      "broadcast-console-to-ops": "false",
+      "broadcast-rcon-to-ops": "false",
+      "sync-chunk-writes": "false",
+      "network-compression-threshold": "-1",
+      "use-native-transport": "false",
+      "entity-broadcast-range-percentage": "100",
+      "max-players": "4"
+    }
+  },
+  "download": {
+    "content_domains": [
+      "huggingface.co",
+      "hf.co"
+    ],
+    "game_domains": [
+      "mojang.com",
+      "minecraft.net",
+      "fabricmc.net"
+    ],
+    "mod_domains": [
+      "modrinth.com"
+    ],
+    "max_retries": 4,
+    "backoff_seconds": 2
+  },
+  "modpack": {
+    "id": "fabulously-optimized",
+    "name": "Fabulously Optimized",
+    "version": "5.4.1",
+    "url": "https://cdn.modrinth.com/data/1KVo5zza/versions/2ZbcYfCj/Fabulously.Optimized-5.4.1.mrpack",
+    "sha512": "af4b2043f00bcceefdbe1c0ec3ea3cc4d385052d963a9778164b702c3a5dad6e60aa30a1d293ab03b5b780fe1fce75dc846ee3d40a7d1c01bddf74dd76174e62",
+    "approx_mb": 120,
+    "extra_mods": [
+      {
+        "name": "CustomSkinLoader",
+        "path": "mods/CustomSkinLoader_Universal-15.0.1.jar",
+        "url": "https://cdn.modrinth.com/data/idMHQ4n2/versions/OLaesh5y/CustomSkinLoader_Universal-15.0.1.jar",
+        "sha512": "8c65193c46c1435ddea571901f1dd04cc179179f59f1c1a0449349de04722b9c1b6e5efaec166975e05d2fa0b05f6c07c9d5d93a05f1c9a57fece2a0d0fc1ce7"
+      }
+    ]
+  },
+  "resources": [
+    {
+      "id": "map",
+      "name": "Witchcraft and Wizardry",
+      "kind": "world",
+      "url": "https://huggingface.co/datasets/Foxybeo/wz_launcher/resolve/main/Witchcraft%20and%20Wizardry.zip?download=true",
+      "sha256": "",
+      "approx_mb": 1100
+    },
+    {
+      "id": "resource_pack",
+      "name": "Resource Pack",
+      "kind": "resourcepack",
+      "url": "https://huggingface.co/datasets/Foxybeo/wz_launcher/resolve/main/Resource%20Pack.zip?download=true",
+      "sha256": "",
+      "approx_mb": 350,
+      "convert_from": 6
+    }
+  ],
+  "signing": {
+    "public_key": ""
+  }
+}
