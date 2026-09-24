@@ -65,7 +65,6 @@ class PackLibrary(private val gameDir: Path) {
     fun setEnabled(name: String, enabled: Boolean) {
         val pack = resolve(name) ?: throw LauncherException("That resource pack is no longer installed.")
         val entry = "file/${pack.fileName}"
-        val format = runCatching { LegacyTranslator.readFormat(read(pack, "pack.mcmeta")!!) }.getOrDefault(15)
         editOptions { lists ->
             val packs = lists.getOrPut("resourcePacks") { mutableListOf("vanilla") }
             val incompatible = lists.getOrPut("incompatibleResourcePacks") { mutableListOf() }
@@ -73,7 +72,6 @@ class PackLibrary(private val gameDir: Path) {
             if (enabled) {
                 if ("vanilla" !in packs) packs.add(0, "vanilla")
                 packs += entry
-                if (format != LegacyTranslator.TARGET_FORMAT) incompatible += entry
             }
         }
     }

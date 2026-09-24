@@ -63,7 +63,7 @@ class WebApp(private val launcher: Launcher) : Bridge.Host {
     private val logo: Image? = runCatching { ImageIO.read(WebApp::class.java.getResource("/dev/wizardlauncher/app/logo.png")) }.getOrNull()
 
     fun start() {
-        val earlyAwt = Platform.current != Platform.LINUX
+        val earlyAwt = Platform.current == Platform.WINDOWS
         val splash = if (earlyAwt) Splash(logo).also { s -> SwingUtilities.invokeAndWait { s.isVisible = true } } else null
         try {
             app = buildCef(splash)

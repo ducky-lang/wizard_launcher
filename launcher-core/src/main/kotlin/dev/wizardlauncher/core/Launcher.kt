@@ -95,7 +95,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             ServersDat.upsert(paths.gameDir.resolve("servers.dat"), catalog.server.entryName, address)
             packName?.let {
                 GameOptions.enableResourcePack(paths.gameDir.resolve("options.txt"), it,
-                    compatible = false, stale = listOf("$it (1.20.1).zip"))
+                    compatible = true, stale = listOf("$it (1.20.1).zip"))
             }
 
             stage(4)
@@ -158,7 +158,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             val target = paths.gameDir.resolve("resourcepacks").resolve(packName)
             Files.createDirectories(target.parent)
             if (Files.isDirectory(pack)) SafeZip.copyTree(pack, target) else Files.copy(pack, target, StandardCopyOption.REPLACE_EXISTING)
-            GameOptions.enableResourcePack(paths.gameDir.resolve("options.txt"), packName, compatible = false, stale = emptyList())
+            GameOptions.enableResourcePack(paths.gameDir.resolve("options.txt"), packName, compatible = true, stale = emptyList())
         }
         val log = paths.gameDir.resolve("logs").resolve("latest.log")
         Files.deleteIfExists(log)
@@ -171,7 +171,6 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             "Legacy pack support active" to Regex("Wizard Legacy Packs active"),
             "Legacy pack read natively" to Regex("Reading '.*' \\(pack_format \\d+\\) natively"),
             "Block atlas built" to Regex("Created: .*minecraft:textures/atlas/blocks\\.png-atlas"),
-            "Sound engine started" to Regex("Sound engine started"),
         )
         val seen = LinkedHashSet<String>()
         var text = ""
