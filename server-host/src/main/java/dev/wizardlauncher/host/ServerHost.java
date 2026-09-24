@@ -11,7 +11,12 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Method;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
 import java.net.Socket;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -37,6 +42,8 @@ public final class ServerHost {
         int serverPort = Integer.parseInt(args.getOrDefault("server-port", "25565"));
         String proxyBind = args.get("proxy-bind");
         String targetVersion = args.getOrDefault("target-version", "1.16.5");
+
+        ProxySelector.setDefault(new LocalOnlySelector());
 
         InputStream control = new FileInputStream(FileDescriptor.in);
         PipedOutputStream consoleFeed = new PipedOutputStream();
@@ -262,6 +269,27 @@ public final class ServerHost {
     static void log(String message) {
         OUT.println("[WizardHost] " + message);
         OUT.flush();
+    }
+
+    static final class LocalOnlySelector extends ProxySelector {
+        private static final Proxy BLACKHOLE = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(InetAddress.getLoopbackAddress(), 9));
+
+        @Override
+        public List<Proxy> select(URI uri) {
+            String host = uri.getHost();
+            if (host != null && isLocal(host)) {
+                return List.of(Proxy.NO_PROXY);
+            }
+            return List.of(BLACKHOLE);
+        }
+
+        static boolean isLocal(String host) {
+            return host.equals("localhost") || host.startsWith("127.") || host.equals("::1") || host.equals("[::1]");
+        }
+
+        @Override
+        public void connectFailed(URI uri, SocketAddress sa, IOException ioe) {
+        }
     }
 
     private static final class NoConsole extends InputStream {
