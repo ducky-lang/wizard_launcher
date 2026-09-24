@@ -51,7 +51,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             ContentInstaller(paths, state, downloader(Catalog.current.download.content), Progress.NONE).isWorldInstalled()
     }
 
-    fun play(account: Account, progress: Progress): Process {
+    fun play(account: Account, progress: Progress, stage: (Int) -> Unit = {}): Process {
         if (!playLock.tryLock()) throw LauncherException("A launch is already in progress.")
         try {
             supervisor.reapOrphans()
@@ -70,16 +70,20 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             val modpack = ModpackInstaller(paths, state, downloader(catalog.download.mods), progress)
             val game = MinecraftInstaller(paths, state, downloader(catalog.download.game), progress)
 
+            stage(0)
             progress.update(0.02, "Preparing the castle...")
             content.ensureWorld()
+            stage(1)
             if (!modpack.isInstalled()) modpack.fetchArchive()
             val versionId = game.ensure(modpack.loaderVersion())
+            stage(2)
             modpack.ensure()
             content.ensureLegacyPackSupport()
             val packName = runCatching { content.ensureResourcePack() }
                 .onFailure { Log.error("The resource pack could not be installed; continuing without it: ${it.message}", it) }
                 .getOrNull()
 
+            stage(3)
             progress.update(0.75, "Opening the portal...")
             val server = ServerRunner(paths, settings, state, supervisor, java, tool("wizard-server-host.jar"))
             this.server = server
@@ -94,6 +98,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
                     compatible = false, stale = listOf("$it (1.20.1).zip"))
             }
 
+            stage(4)
             progress.update(0.9, "Launching Minecraft...")
             Log.info("Launching Minecraft as ${account.name}${if (account.isMicrosoft) "" else " (offline name)"}...")
             val client = ClientRunner(paths, settings, supervisor, java, tool("wizard-client-boot.jar"))
@@ -181,9 +186,17 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         client.toHandle().descendants().forEach { it.destroyForcibly() }
         client.destroyForcibly()
         val errors = text.lines().filter { it.contains("/ERROR]") || it.contains("Exception") }.take(15)
+        val diagnostics = text.lines().filter {
+            it.contains("WizardLegacyPacks") || it.contains("Reloading ResourceManager") || it.contains("resource pack", ignoreCase = true) ||
+                (packName != null && it.contains(packName))
+        }.take(25)
         return buildString {
             appendLine("Client was ${if (alive) "running" else "not running (exit ${runCatching { client.exitValue() }.getOrDefault(-1)})"} at the end of the test")
             markers.keys.forEach { appendLine((if (it in seen) "[ok] " else "[--] ") + it) }
+            if (diagnostics.isNotEmpty()) {
+                appendLine("Resource pack lines in latest.log:")
+                diagnostics.forEach { appendLine("  $it") }
+            }
             if (errors.isNotEmpty()) {
                 appendLine("Errors in latest.log:")
                 errors.forEach { appendLine("  $it") }

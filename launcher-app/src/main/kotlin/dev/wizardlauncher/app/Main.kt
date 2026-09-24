@@ -1,6 +1,7 @@
 package dev.wizardlauncher.app
 
 import dev.wizardlauncher.core.AppPaths
+import dev.wizardlauncher.app.ui.WebApp
 import dev.wizardlauncher.core.BuildInfo
 import dev.wizardlauncher.core.Launcher
 import dev.wizardlauncher.core.LauncherException
@@ -36,7 +37,6 @@ fun main(args: Array<String>) {
             "Wizard Launcher", JOptionPane.INFORMATION_MESSAGE)
         return
     }
-    Theme.install()
     val launcher = try {
         Launcher(paths)
     } catch (t: Throwable) {
@@ -46,6 +46,15 @@ fun main(args: Array<String>) {
     Thread.setDefaultUncaughtExceptionHandler { thread, e ->
         dev.wizardlauncher.core.Log.error("Unhandled error in ${thread.name}: ${e.message}", e)
     }
+    if ("--classic" !in args && System.getProperty("wizard.classicUi") != "true") {
+        try {
+            WebApp(launcher).start()
+            return
+        } catch (t: Throwable) {
+            dev.wizardlauncher.core.Log.error("The web interface could not start (${t.message}); using the classic window.", t)
+        }
+    }
+    Theme.install()
     SwingUtilities.invokeLater { MainWindow(launcher).isVisible = true }
 }
 

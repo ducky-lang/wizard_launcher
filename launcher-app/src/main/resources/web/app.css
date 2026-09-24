@@ -380,3 +380,4 @@ pre.report { max-height: 320px; overflow: auto; padding: 14px; border-radius: 12
 .chip svg { width: 14px; height: 14px; }
 .play .spinner { width: 22px; height: 22px; border-width: 3px; border-color: rgba(26, 18, 4, .25); border-top-color: #1a1204; }
 .play .pi { display: inline-flex; }
+.card .tag { white-space: normal; height: auto; min-height: 22px; padding: 3px 8px; line-height: 1.35; }

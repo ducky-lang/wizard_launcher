@@ -199,7 +199,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
 
     private fun refreshAccount() {
         val profile = launcher.accounts.cachedProfile()
-        val offlineName = launcher.settings.offlineName
+        val offlineName = launcher.accounts.selected()?.takeIf { !it.isMicrosoft }?.name ?: ""
         when {
             profile != null -> { accountLabel.text = profile.first; accountMode.text = "Microsoft account" }
             offlineName.isNotBlank() -> { accountLabel.text = offlineName; accountMode.text = "Offline name" }
@@ -218,8 +218,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
             JOptionPane.showMessageDialog(this, "That name cannot be used in Minecraft.", "Name", JOptionPane.WARNING_MESSAGE)
             return false
         }
-        launcher.settings.offlineName = name
-        launcher.settings.save()
+        launcher.accounts.addOffline(name)
         refreshAccount()
         return true
     }
