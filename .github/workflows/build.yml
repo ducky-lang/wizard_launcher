@@ -168,6 +168,7 @@ jobs:
           else
             echo "name=v$(grep '^launcherVersion=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
           fi
+          echo "title=$(head -n 1 .github/release-notes.md | sed 's/^#* *//')" >> "$GITHUB_OUTPUT"
       - name: Replace an existing release of the same version
         if: github.event_name == 'workflow_dispatch'
         env: { GH_TOKEN: "${{ github.token }}" }
@@ -182,7 +183,7 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.name }}
           target_commitish: ${{ github.sha }}
-          name: Wizard Launcher ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.title }}
           body_path: .github/release-notes.md
           files: |
             dist/*.exe
