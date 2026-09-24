@@ -19,6 +19,7 @@ import dev.wizardlauncher.core.runtime.JavaLocator
 import dev.wizardlauncher.core.security.SecretStore
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.locks.ReentrantLock
@@ -74,7 +75,8 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             if (!modpack.isInstalled()) modpack.fetchArchive()
             val versionId = game.ensure(modpack.loaderVersion())
             modpack.ensure()
-            val packName = runCatching { content.ensureResourcePack(settings.convertResourcePack) }
+            content.ensureLegacyPackSupport()
+            val packName = runCatching { content.ensureResourcePack() }
                 .onFailure { Log.error("The resource pack could not be installed; continuing without it: ${it.message}", it) }
                 .getOrNull()
 
@@ -89,7 +91,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             ServersDat.upsert(paths.gameDir.resolve("servers.dat"), catalog.server.entryName, address)
             packName?.let {
                 GameOptions.enableResourcePack(paths.gameDir.resolve("options.txt"), it,
-                    compatible = settings.convertResourcePack, stale = listOf(catalog.resource("resource_pack").name))
+                    compatible = false, stale = listOf("$it (1.20.1).zip"))
             }
 
             progress.update(0.9, "Launching Minecraft...")
@@ -105,6 +107,87 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             throw e
         } finally {
             playLock.unlock()
+        }
+    }
+
+    fun verifyInstall(progress: Progress, repair: Boolean = true): String {
+        val catalog = Catalog.current
+        val modpack = ModpackInstaller(paths, state, downloader(catalog.download.mods), progress)
+        val game = MinecraftInstaller(paths, state, downloader(catalog.download.game), progress)
+        val content = ContentInstaller(paths, state, downloader(catalog.download.content), progress)
+        if (repair) {
+            if (!modpack.isInstalled()) modpack.fetchArchive()
+            game.ensure(modpack.loaderVersion(), verify = true)
+            modpack.ensure()
+            content.ensureLegacyPackSupport()
+        }
+        val loader = modpack.loaderVersion()
+        val missing = game.missingFiles(loader)
+        val java = JavaLocator.find(settings, catalog.minecraft.requiredJava)
+        val profile = VersionProfile.load(paths, game.fabricId(loader))
+        val boot = tool("wizard-client-boot.jar")
+        val command = ClientRunner(paths, settings, supervisor, java, boot)
+            .command(profile, Account.offline("WizardCheck"), "127.0.0.1:25566")
+        val legacy = Files.isRegularFile(paths.gameDir.resolve("mods").resolve(ContentInstaller.LEGACY_MOD))
+        if (missing.isNotEmpty()) {
+            throw LauncherException("${missing.size} game file(s) are missing:\n" + missing.take(10).joinToString("\n"))
+        }
+        return buildString {
+            appendLine("Game: ${profile.id} (${profile.libraries.size} libraries, main ${profile.mainClass})")
+            appendLine("Modpack: ${catalog.modpack.name} ${catalog.modpack.version}, installed=${modpack.isInstalled()}")
+            appendLine("Legacy pack support: ${if (legacy) "installed" else "not bundled"}")
+            appendLine("Java: $java")
+            appendLine("Launch command: ${command.size} arguments, all ${profile.libraries.size + 2} classpath entries present")
+        }
+    }
+
+    fun smokeClient(progress: Progress, timeoutSeconds: Long, pack: Path?): String {
+        verifyInstall(progress)
+        val catalog = Catalog.current
+        val modpack = ModpackInstaller(paths, state, downloader(catalog.download.mods), progress)
+        val game = MinecraftInstaller(paths, state, downloader(catalog.download.game), progress)
+        val java = JavaLocator.find(settings, catalog.minecraft.requiredJava)
+        var packName: String? = null
+        if (pack != null) {
+            packName = pack.fileName.toString()
+            val target = paths.gameDir.resolve("resourcepacks").resolve(packName)
+            Files.createDirectories(target.parent)
+            if (Files.isDirectory(pack)) SafeZip.copyTree(pack, target) else Files.copy(pack, target, StandardCopyOption.REPLACE_EXISTING)
+            GameOptions.enableResourcePack(paths.gameDir.resolve("options.txt"), packName, compatible = false, stale = emptyList())
+        }
+        val log = paths.gameDir.resolve("logs").resolve("latest.log")
+        Files.deleteIfExists(log)
+        progress.update(null, "Starting Minecraft for a smoke test...")
+        val client = ClientRunner(paths, settings, supervisor, java, tool("wizard-client-boot.jar"))
+            .launch(VersionProfile.load(paths, game.fabricId(modpack.loaderVersion())), Account.offline("WizardSmoke"), null)
+        val deadline = System.currentTimeMillis() + timeoutSeconds * 1000
+        val markers = linkedMapOf(
+            "Fabric loaded mods" to Regex("Loading \\d+ mods"),
+            "Legacy pack support active" to Regex("Wizard Legacy Packs active"),
+            "Legacy pack read natively" to Regex("Reading '.*' \\(pack_format \\d+\\) natively"),
+            "Block atlas built" to Regex("Created: .*minecraft:textures/atlas/blocks\\.png-atlas"),
+            "Sound engine started" to Regex("Sound engine started"),
+        )
+        val seen = LinkedHashSet<String>()
+        var text = ""
+        while (System.currentTimeMillis() < deadline && client.isAlive) {
+            Thread.sleep(2000)
+            text = runCatching { Files.readString(log) }.getOrDefault("")
+            markers.forEach { (name, re) -> if (re.containsMatchIn(text)) seen += name }
+            val needed = if (packName != null) markers.keys else markers.keys - "Legacy pack read natively"
+            if (seen.containsAll(needed)) break
+        }
+        val alive = client.isAlive
+        client.toHandle().descendants().forEach { it.destroyForcibly() }
+        client.destroyForcibly()
+        val errors = text.lines().filter { it.contains("/ERROR]") || it.contains("Exception") }.take(15)
+        return buildString {
+            appendLine("Client was ${if (alive) "running" else "not running (exit ${runCatching { client.exitValue() }.getOrDefault(-1)})"} at the end of the test")
+            markers.keys.forEach { appendLine((if (it in seen) "[ok] " else "[--] ") + it) }
+            if (errors.isNotEmpty()) {
+                appendLine("Errors in latest.log:")
+                errors.forEach { appendLine("  $it") }
+            }
         }
     }
 

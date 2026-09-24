@@ -93,6 +93,15 @@ object GameOptions {
         Files.write(optionsFile, lines)
     }
 
+    fun setFullscreen(optionsFile: Path, fullscreen: Boolean) {
+        val lines = if (Files.isRegularFile(optionsFile)) Files.readAllLines(optionsFile).toMutableList() else mutableListOf()
+        val idx = lines.indexOfFirst { it.startsWith("fullscreen:") }
+        val line = "fullscreen:$fullscreen"
+        if (idx >= 0) lines[idx] = line else lines += line
+        Files.createDirectories(optionsFile.parent)
+        Files.write(optionsFile, lines)
+    }
+
     private fun parseList(raw: String): MutableList<String> =
         Regex("\"((?:[^\"\\\\]|\\\\.)*)\"").findAll(raw).map { it.groupValues[1].replace("\\\"", "\"") }.toMutableList()
 }

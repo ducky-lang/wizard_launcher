@@ -28,19 +28,46 @@ class MinecraftInstaller(
 ) {
     private val mc = Catalog.current.minecraft.clientVersion
 
-    fun isInstalled(loader: String): Boolean {
-        val id = fabricId(loader)
-        return state.matches("minecraft", InstallState.fingerprint(mc, loader)) &&
-            Files.isRegularFile(paths.versions.resolve(id).resolve("$id.json")) &&
-            Files.isRegularFile(paths.versions.resolve(mc).resolve("$mc.jar"))
-    }
-
     fun fabricId(loader: String) = "fabric-loader-$loader-$mc"
 
-    fun ensure(loader: String): String {
+    fun isInstalled(loader: String): Boolean =
+        state.matches("minecraft", InstallState.fingerprint(mc, loader)) && missingFiles(loader).isEmpty()
+
+    fun missingFiles(loader: String): List<Path> {
         val id = fabricId(loader)
-        if (isInstalled(loader)) return id
-        Log.info("Installing Minecraft $mc with Fabric $loader (first run only)...")
+        val fabricJson = paths.versions.resolve(id).resolve("$id.json")
+        val vanillaJson = paths.versions.resolve(mc).resolve("$mc.json")
+        if (!Files.isRegularFile(fabricJson) || !Files.isRegularFile(vanillaJson)) return listOf(fabricJson, vanillaJson).filterNot(Files::isRegularFile)
+        val profile = runCatching { VersionProfile.load(paths, id) }.getOrElse { return listOf(fabricJson) }
+        val missing = ArrayList<Path>()
+        if (!Files.isRegularFile(profile.clientJar)) missing.add(profile.clientJar)
+        profile.libraries.map { paths.libraries.resolve(it.path) }.filterNotTo(missing, Files::isRegularFile)
+        val index = paths.assets.resolve("indexes").resolve(profile.assetIndex + ".json")
+        if (!Files.isRegularFile(index)) {
+            missing.add(index)
+        } else {
+            val objects = Json.read(index)?.asJsonObject?.getAsJsonObject("objects")
+            objects?.entrySet()?.forEach { (_, v) ->
+                val hash = v.asJsonObject.get("hash").asString
+                val file = paths.assets.resolve("objects").resolve(hash.substring(0, 2)).resolve(hash)
+                if (!Files.isRegularFile(file)) missing.add(file)
+            }
+        }
+        if (profile.libraries.any { it.isNatives } && !Files.isDirectory(profile.nativesDir)) missing.add(profile.nativesDir)
+        return missing
+    }
+
+    fun ensure(loader: String, verify: Boolean = false): String {
+        val id = fabricId(loader)
+        val recorded = state.matches("minecraft", InstallState.fingerprint(mc, loader))
+        val missing = if (recorded) missingFiles(loader) else emptyList()
+        if (recorded && missing.isEmpty() && !verify) return id
+        if (recorded && missing.isNotEmpty()) {
+            Log.info("Repairing ${missing.size} missing game file(s)...")
+            Log.file("Missing: " + missing.take(20).joinToString())
+        } else if (!recorded) {
+            Log.info("Installing Minecraft $mc with Fabric $loader (first run only)...")
+        }
         progress.update(null, "Reading Minecraft $mc metadata...")
 
         val manifest = JsonParser.parseString(downloader.fetchText(VERSION_MANIFEST)).asJsonObject
@@ -61,24 +88,36 @@ class MinecraftInstaller(
         val fabric = Json.read(fabricJson)!!.asJsonObject
 
         val profile = VersionProfile.merge(paths, vanilla, fabric)
-        downloadLibraries(profile.libraries)
+        downloadLibraries(profile.libraries, verify)
         extractNatives(profile)
-        downloadAssets(vanilla)
+        downloadAssets(vanilla, verify)
 
+        val stillMissing = missingFiles(loader)
+        if (stillMissing.isNotEmpty()) {
+            throw LauncherException("The game could not be fully installed; ${stillMissing.size} file(s) are still missing, for example:\n" +
+                stillMissing.take(3).joinToString("\n"))
+        }
         state.mark("minecraft", InstallState.fingerprint(mc, loader))
-        Log.info("Minecraft $mc with Fabric $loader installed.")
+        Log.info("Minecraft $mc with Fabric $loader is ready.")
         return id
     }
 
-    private fun downloadLibraries(libraries: List<Library>) {
-        val todo = libraries.filter { it.url != null }
+    private fun present(target: Path, size: Long?): Boolean =
+        size != null && size > 0 && Files.isRegularFile(target) && Files.size(target) == size
+
+    private fun downloadLibraries(libraries: List<Library>, verify: Boolean) {
         val done = AtomicInteger()
+        val unreachable = libraries.filter { it.url == null && !Files.isRegularFile(paths.libraries.resolve(it.path)) }
+        if (unreachable.isNotEmpty()) {
+            throw LauncherException("Minecraft lists game libraries without a download address:\n" + unreachable.joinToString("\n") { it.name })
+        }
+        val todo = libraries.filter { it.url != null }
         parallel(todo) { lib ->
             val target = paths.libraries.resolve(lib.path)
-            if (lib.sha1 == null) {
-                if (!Files.isRegularFile(target)) downloader.download(lib.url!!, target, resume = false)
-            } else {
-                downloader.download(lib.url!!, target, Checksum.sha1(lib.sha1))
+            when {
+                !verify && present(target, lib.size) -> Unit
+                lib.sha1 == null -> if (verify || !Files.isRegularFile(target)) downloader.download(lib.url!!, target, resume = false)
+                else -> downloader.download(lib.url!!, target, Checksum.sha1(lib.sha1))
             }
             val n = done.incrementAndGet()
             progress.update(n.toDouble() / todo.size, "Game libraries  ·  $n of ${todo.size}")
@@ -95,7 +134,6 @@ class MinecraftInstaller(
                     .filter { !it.isDirectory && !it.name.startsWith("META-INF/") }
                     .filter { it.name.endsWith(".dll") || it.name.endsWith(".so") || it.name.endsWith(".dylib") || it.name.endsWith(".jnilib") }
                     .forEach { entry ->
-
                         val target = dir.resolve(entry.name.substringAfterLast('/'))
                         zip.getInputStream(entry).use { Files.copy(it, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
                     }
@@ -103,19 +141,23 @@ class MinecraftInstaller(
         }
     }
 
-    private fun downloadAssets(vanilla: JsonObject) {
+    private fun downloadAssets(vanilla: JsonObject, verify: Boolean) {
         val index = vanilla.getAsJsonObject("assetIndex")
         val indexFile = paths.assets.resolve("indexes").resolve(index.get("id").asString + ".json")
         downloader.download(index.get("url").asString, indexFile, Checksum.sha1(index.get("sha1").asString))
         val objects = Json.read(indexFile)!!.asJsonObject.getAsJsonObject("objects").entrySet().map { it.value.asJsonObject }
-        val total = objects.sumOf { it.get("size").asLong }
+            .distinctBy { it.get("hash").asString }
+        val total = objects.sumOf { it.get("size").asLong }.coerceAtLeast(1)
         val bytes = AtomicLong()
         val count = AtomicInteger()
-        parallel(objects.distinctBy { it.get("hash").asString }) { obj ->
+        parallel(objects) { obj ->
             val hash = obj.get("hash").asString
+            val size = obj.get("size").asLong
             val target = paths.assets.resolve("objects").resolve(hash.substring(0, 2)).resolve(hash)
-            downloader.download("$RESOURCES/${hash.substring(0, 2)}/$hash", target, Checksum.sha1(hash), resume = false)
-            val b = bytes.addAndGet(obj.get("size").asLong)
+            if (verify || !present(target, size)) {
+                downloader.download("$RESOURCES/${hash.substring(0, 2)}/$hash", target, Checksum.sha1(hash), resume = false)
+            }
+            val b = bytes.addAndGet(size)
             if (count.incrementAndGet() % 25 == 0) {
                 progress.update(b.toDouble() / total, "Game assets  ·  ${formatBytes(b)} of ${formatBytes(total)}")
             }
@@ -141,7 +183,7 @@ class MinecraftInstaller(
     }
 }
 
-data class Library(val name: String, val path: String, val url: String?, val sha1: String?) {
+data class Library(val name: String, val path: String, val url: String?, val sha1: String?, val size: Long? = null) {
     val key: String get() = name.split(':').let { p -> listOf(p[0], p[1], p.getOrNull(3) ?: "").joinToString(":") }
     val isNatives get() = name.split(':').getOrNull(3)?.startsWith("natives-") == true
 
@@ -206,11 +248,11 @@ class VersionProfile(
                 val artifact = lib.getAsJsonObject("downloads")?.getAsJsonObject("artifact")
                 out += if (artifact != null) {
                     Library(name, artifact.get("path").asString, artifact.get("url")?.asString?.takeIf { it.isNotBlank() },
-                        artifact.get("sha1")?.asString)
+                        artifact.get("sha1")?.asString, artifact.get("size")?.asLong)
                 } else {
                     val path = Library.pathOf(name)
                     val base = (lib.get("url")?.asString ?: "https://libraries.minecraft.net/").trimEnd('/')
-                    Library(name, path, "$base/$path", lib.get("sha1")?.asString)
+                    Library(name, path, "$base/$path", lib.get("sha1")?.asString, lib.get("size")?.asLong)
                 }
             }
             return out

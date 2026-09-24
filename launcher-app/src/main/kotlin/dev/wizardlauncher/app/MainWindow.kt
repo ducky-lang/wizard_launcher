@@ -8,7 +8,7 @@ import dev.wizardlauncher.core.Settings
 import dev.wizardlauncher.core.auth.Account
 import dev.wizardlauncher.core.install.OfflineBundle
 import dev.wizardlauncher.core.install.Progress
-import dev.wizardlauncher.pack.PackConverter
+import dev.wizardlauncher.legacy.PackExporter
 import java.awt.BorderLayout
 import java.awt.Cursor
 import java.awt.Desktop
@@ -295,9 +295,9 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         val output = choose("Save the 1.20.1 pack as", open = false, suggested = input.fileName.toString().removeSuffix(".zip") + " (1.20.1).zip") ?: return
         background("Converting resource pack...") {
             val rules = launcher.paths.root.resolve("wizard-states.json").takeIf { java.nio.file.Files.isRegularFile(it) }
-            val report = PackConverter(null, Log::file).convert(input, output, listOfNotNull(rules))
-            Log.info("Converted -> $output (${report.filesRewritten} files adapted, ${report.warnings.size} note(s)).")
-            ui { ReportDialog(this, report.render()).isVisible = true }
+            val overlay = PackExporter.export(input, output, listOfNotNull(rules?.let { java.nio.file.Files.readString(it) }), null)
+            Log.info("Exported -> $output (${overlay.files().size} files adapted, ${overlay.warnings().size} note(s)).")
+            ui { ReportDialog(this, overlay.report()).isVisible = true }
         }
     }
 

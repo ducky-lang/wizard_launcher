@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "wizard_legacy_packs",
+  "version": "${version}",
+  "name": "Wizard Legacy Packs",
+  "description": "Lets Minecraft 1.20.1 read resource packs made for 1.13-1.19.4 directly, as the game they were made for would.",
+  "authors": ["Foxy"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "preLaunch": ["dev.wizardlauncher.legacypacks.LegacyPacksPreLaunch"],
+    "client": ["dev.wizardlauncher.legacypacks.LegacyPacksClient"]
+  },
+  "mixins": ["wizard_legacy_packs.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "minecraft": "~1.20.1",
+    "java": ">=17"
+  }
+}

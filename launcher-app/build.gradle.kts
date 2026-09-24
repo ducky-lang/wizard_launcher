@@ -5,7 +5,7 @@ plugins {
 
 dependencies {
     implementation(project(":launcher-core"))
-    implementation(project(":pack-converter"))
+    implementation(project(":pack-legacy"))
     implementation("com.formdev:flatlaf:3.5.2")
 }
 
@@ -27,21 +27,34 @@ val helperJars = files(
     project(":client-boot").tasks.named("jar"),
 )
 
+val legacyModJar = rootProject.file("legacy-mod/build/libs/wizard-legacy-packs.jar")
+
+val stageResources = tasks.register<Sync>("stageResources") {
+    from(rootProject.file("resources"))
+    from(rootProject.layout.buildDirectory.dir("bundled"))
+    from(legacyModJar) { into("mods") }
+    into(layout.buildDirectory.dir("staged-resources"))
+}
+
 distributions {
     main {
         contents {
             into("lib") { from(helperJars) }
-
-            into("resources") {
-                from(rootProject.file("resources"))
-            }
+            into("resources") { from(stageResources) }
         }
     }
 }
 
+tasks.processResources {
+    from(rootProject.file("assets/floo-logo.png")) {
+        into("dev/wizardlauncher/app")
+        rename { "logo.png" }
+    }
+}
+
 tasks.named<JavaExec>("run") {
-    dependsOn(":server-host:jar", ":client-boot:jar")
-    systemProperty("wizard.resources", rootProject.file("resources").absolutePath)
+    dependsOn(":server-host:jar", ":client-boot:jar", stageResources)
+    systemProperty("wizard.resources", layout.buildDirectory.dir("staged-resources").get().asFile.absolutePath)
     systemProperty("wizard.tools", layout.buildDirectory.dir("helper-jars").get().asFile.absolutePath)
     doFirst {
         copy { from(helperJars); into(layout.buildDirectory.dir("helper-jars")) }
@@ -50,13 +63,13 @@ tasks.named<JavaExec>("run") {
 
 tasks.register<Exec>("jpackage") {
     group = "distribution"
-    dependsOn("installDist", ":makeIcons")
+    dependsOn("installDist", ":makeIcons", stageResources)
     val type = (findProperty("jpackageType") ?: "app-image").toString()
     val input = layout.buildDirectory.dir("install/WizardLauncher/lib").get().asFile
     val out = layout.buildDirectory.dir("jpackage").get().asFile
     doFirst {
         delete(out)
-        copy { from(rootProject.file("resources")); into(File(input, "resources")) }
+        copy { from(layout.buildDirectory.dir("staged-resources")); into(File(input, "resources")) }
     }
     val os = org.gradle.internal.os.OperatingSystem.current()
     val icon = when {

@@ -38,7 +38,6 @@ class SettingsDialog(owner: JFrame, private val settings: Settings, private val 
     private val lan = JCheckBox("Let devices on my network join (LAN)", settings.allowLan)
     private val offline = JCheckBox("Offline mode - never use the internet", settings.offlineOnly)
     private val restart = JCheckBox("Restart the world automatically if it crashes", settings.autoRestartServer)
-    private val convert = JCheckBox("Convert the 1.16.5 resource pack for 1.20.1 (recommended)", settings.convertResourcePack)
     private val closeOnPlay = JCheckBox("Close the launcher when the game starts", settings.closeLauncherOnPlay)
     private val javaPath = JTextField(settings.javaPath, 28)
 
@@ -57,7 +56,7 @@ class SettingsDialog(owner: JFrame, private val settings: Settings, private val 
         add("World memory (MB)", serverRam, "0 = automatic (now ${settings.effectiveServerRamMb} MB)")
         add("Game memory (MB)", clientRam, "0 = automatic (now ${settings.effectiveClientRamMb} MB)")
         add("Java (optional)", javaPath, "Empty = the Java 17 bundled with the launcher")
-        listOf(offline, lan, restart, convert, closeOnPlay).forEach { add(null, it) }
+        listOf(offline, lan, restart, closeOnPlay).forEach { add(null, it) }
 
         val save = JButton("Save").apply { addActionListener { save() } }
         val cancel = JButton("Cancel").apply { addActionListener { dispose() } }
@@ -77,8 +76,7 @@ class SettingsDialog(owner: JFrame, private val settings: Settings, private val 
         settings.allowLan = lan.isSelected
         settings.offlineOnly = offline.isSelected
         settings.autoRestartServer = restart.isSelected
-        settings.convertResourcePack = convert.isSelected
-        settings.closeLauncherOnPlay = closeOnPlay.isSelected
+        settings.afterLaunch = if (closeOnPlay.isSelected) Settings.AfterLaunch.CLOSE else Settings.AfterLaunch.MINIMIZE
         settings.javaPath = javaPath.text.trim()
         settings.save()
         if (settings.allowLan) Log.info("LAN play is ON - other devices on your network can join the world.")

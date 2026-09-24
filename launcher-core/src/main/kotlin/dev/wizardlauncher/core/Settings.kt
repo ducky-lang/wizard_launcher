@@ -11,46 +11,74 @@ class Settings(private val file: Path) {
     var allowLan = false
     var offlineOnly = false
     var autoRestartServer = true
-    var convertResourcePack = true
     var javaPath = ""
-    var closeLauncherOnPlay = false
+    var afterLaunch = AfterLaunch.MINIMIZE
     var offlineName = ""
     var keepLogDays = 7
+    var language = "en"
+    var animations = true
+    var hardwareAcceleration = true
+    var gameWidth = 0
+    var gameHeight = 0
+    var fullscreen = false
+    var checkUpdates = true
+    var onboardingDone = false
 
     enum class MemoryProfile { LOW, BALANCED, HIGH }
+    enum class AfterLaunch { KEEP_OPEN, MINIMIZE, CLOSE }
+
+    val closeLauncherOnPlay get() = afterLaunch == AfterLaunch.CLOSE
 
     fun load(): Settings {
         val o = Json.read(file)?.takeIf { it.isJsonObject }?.asJsonObject ?: return this
-        serverRamMb = ram(o, "server_ram_mb")
-        clientRamMb = ram(o, "client_ram_mb")
-        memoryProfile = runCatching { MemoryProfile.valueOf(o.get("memory_profile").asString) }.getOrDefault(MemoryProfile.BALANCED)
-        allowLan = bool(o, "allow_lan", false)
-        offlineOnly = bool(o, "offline_only", false)
-        autoRestartServer = bool(o, "auto_restart_server", true)
-        convertResourcePack = bool(o, "convert_resource_pack", true)
-        javaPath = o.get("java_path")?.takeIf { it.isJsonPrimitive }?.asString ?: ""
-        closeLauncherOnPlay = bool(o, "close_launcher_on_play", false)
-        offlineName = o.get("offline_name")?.takeIf { it.isJsonPrimitive }?.asString?.takeIf(::validName) ?: ""
-        keepLogDays = runCatching { o.get("keep_log_days").asInt.coerceIn(1, 365) }.getOrDefault(7)
+        apply(o)
         return this
     }
 
-    fun save() {
-        val o = JsonObject().apply {
-            addProperty("server_ram_mb", serverRamMb)
-            addProperty("client_ram_mb", clientRamMb)
-            addProperty("memory_profile", memoryProfile.name)
-            addProperty("allow_lan", allowLan)
-            addProperty("offline_only", offlineOnly)
-            addProperty("auto_restart_server", autoRestartServer)
-            addProperty("convert_resource_pack", convertResourcePack)
-            addProperty("java_path", javaPath)
-            addProperty("close_launcher_on_play", closeLauncherOnPlay)
-            addProperty("offline_name", offlineName)
-            addProperty("keep_log_days", keepLogDays)
-        }
-        Json.write(file, o)
+    fun apply(o: JsonObject) {
+        if (o.has("server_ram_mb")) serverRamMb = ram(o, "server_ram_mb")
+        if (o.has("client_ram_mb")) clientRamMb = ram(o, "client_ram_mb")
+        if (o.has("memory_profile")) memoryProfile = runCatching { MemoryProfile.valueOf(o.get("memory_profile").asString) }.getOrDefault(memoryProfile)
+        allowLan = bool(o, "allow_lan", allowLan)
+        offlineOnly = bool(o, "offline_only", offlineOnly)
+        autoRestartServer = bool(o, "auto_restart_server", autoRestartServer)
+        if (o.has("java_path")) javaPath = o.get("java_path")?.takeIf { it.isJsonPrimitive }?.asString?.trim() ?: ""
+        if (o.has("close_launcher_on_play") && bool(o, "close_launcher_on_play", false)) afterLaunch = AfterLaunch.CLOSE
+        if (o.has("after_launch")) afterLaunch = runCatching { AfterLaunch.valueOf(o.get("after_launch").asString) }.getOrDefault(afterLaunch)
+        if (o.has("offline_name")) offlineName = o.get("offline_name")?.takeIf { it.isJsonPrimitive }?.asString?.takeIf(::validName) ?: ""
+        if (o.has("keep_log_days")) keepLogDays = runCatching { o.get("keep_log_days").asInt.coerceIn(1, 365) }.getOrDefault(keepLogDays)
+        if (o.has("language")) language = o.get("language").asString.takeIf { it in LANGUAGES } ?: language
+        animations = bool(o, "animations", animations)
+        hardwareAcceleration = bool(o, "hardware_acceleration", hardwareAcceleration)
+        if (o.has("game_width")) gameWidth = runCatching { o.get("game_width").asInt }.getOrDefault(0).let { if (it <= 0) 0 else it.coerceIn(640, 7680) }
+        if (o.has("game_height")) gameHeight = runCatching { o.get("game_height").asInt }.getOrDefault(0).let { if (it <= 0) 0 else it.coerceIn(480, 4320) }
+        fullscreen = bool(o, "fullscreen", fullscreen)
+        checkUpdates = bool(o, "check_updates", checkUpdates)
+        onboardingDone = bool(o, "onboarding_done", onboardingDone)
     }
+
+    fun toJson(): JsonObject = JsonObject().apply {
+        addProperty("server_ram_mb", serverRamMb)
+        addProperty("client_ram_mb", clientRamMb)
+        addProperty("memory_profile", memoryProfile.name)
+        addProperty("allow_lan", allowLan)
+        addProperty("offline_only", offlineOnly)
+        addProperty("auto_restart_server", autoRestartServer)
+        addProperty("java_path", javaPath)
+        addProperty("after_launch", afterLaunch.name)
+        addProperty("offline_name", offlineName)
+        addProperty("keep_log_days", keepLogDays)
+        addProperty("language", language)
+        addProperty("animations", animations)
+        addProperty("hardware_acceleration", hardwareAcceleration)
+        addProperty("game_width", gameWidth)
+        addProperty("game_height", gameHeight)
+        addProperty("fullscreen", fullscreen)
+        addProperty("check_updates", checkUpdates)
+        addProperty("onboarding_done", onboardingDone)
+    }
+
+    fun save() = Json.write(file, toJson())
 
     val bindAddress get() = if (allowLan) "0.0.0.0" else "127.0.0.1"
 
@@ -75,6 +103,8 @@ class Settings(private val file: Path) {
             runCatching { o.get(key).asInt }.getOrDefault(0).let { if (it <= 0) 0 else it.coerceIn(512, 32768) }
         private fun bool(o: JsonObject, key: String, default: Boolean) =
             runCatching { o.get(key).asBoolean }.getOrDefault(default)
+
+        val LANGUAGES = setOf("en", "vi")
 
         fun validName(name: String) = Regex("^[A-Za-z0-9_]{3,16}$").matches(name)
     }
