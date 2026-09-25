@@ -269,12 +269,28 @@ class LegacyTranslatorTest {
         files["assets/minecraft/textures/font/unicode_page_00.png"] = fontPage()
         val o = overlay(files)
         val providers = o.json("assets/minecraft/font/default.json").getAsJsonArray("providers").map { it.asJsonObject }
-        assertEquals(1, providers.count { it.get("type").asString == "bitmap" })
-        assertEquals('\uE000', providers.first().getAsJsonArray("chars")[0].asString[0])
-        assertNull(o.file("assets/minecraft/textures/font/wizard_legacy_unicode_page_00.png"))
+        val pua = providers.first { it.get("file")?.asString?.endsWith("page_e0.png") == true }
+        assertEquals('\uE000', pua.getAsJsonArray("chars")[0].asString[0])
         val page = ImageIO.read(ByteArrayInputStream(o.file("assets/minecraft/textures/font/wizard_legacy_unicode_page_e0.png")))
         assertEquals(0xFFFF0000.toInt(), page.getRGB(0, 0))
         assertEquals(0xFF00FF00.toInt(), page.getRGB(13, 0))
+    }
+
+    @Test fun `overridden unicode pages draw only the characters 1_16_5 took from them`() {
+        val img = BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB)
+        for (y in 0 until 16) for (x in 0 until 16) {
+            img.setRGB(0xC * 16 + 3 + x % 4, 0xB * 16 + y, 0xFF3366FF.toInt())
+            img.setRGB(x % 5, y, 0xFFFFAA00.toInt())
+        }
+        val files = minimal("assets/minecraft/font/default.json" to """{"providers":[{"type":"bitmap","file":"minecraft:font/ascii.png","ascent":7,"chars":["\u02bd"]}]}""")
+        files["assets/minecraft/textures/font/unicode_page_02.png"] = ByteArrayOutputStream().also { ImageIO.write(img, "png", it) }.toByteArray()
+        val providers = overlay(files).json("assets/minecraft/font/default.json").getAsJsonArray("providers").map { it.asJsonObject }
+        assertEquals("minecraft:font/ascii.png", providers.first().get("file").asString)
+        val page = providers.first { it.get("file")?.asString?.endsWith("page_02.png") == true }
+        val chars = page.getAsJsonArray("chars").joinToString("") { it.asString }
+        assertTrue('\u02bc' in chars)
+        assertFalse('\u0200' in chars)
+        assertFalse('\u02bd' in chars)
     }
 
     @Test fun `player skins moved in 1_19_3 are served from their new folders`() {

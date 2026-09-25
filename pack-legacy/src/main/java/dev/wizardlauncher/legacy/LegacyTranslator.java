@@ -26,7 +26,7 @@ import java.util.function.Predicate;
 public final class LegacyTranslator {
     public static final int TARGET_FORMAT = 15;
     public static final int OLDEST_FORMAT = 4;
-    public static final int REVISION = 3;
+    public static final int REVISION = 4;
     public static final String PACK_RULES = "wizard-states.json";
     public static final Set<String> VANILLA_TEXTURE_ROOTS = Set.of(
         "entity", "misc", "environment", "gui", "font", "painting", "mob_effect", "particle",
@@ -712,7 +712,25 @@ public final class LegacyTranslator {
     }
 
     private void addImplicitGlyphPages() throws IOException {
-        List<JsonObject> pages = fonts.implicitPages();
+        Set<Integer> taken = new HashSet<>(LegacyVanilla.get().bitmapChars);
+        if (pack.exists(DEFAULT_FONT)) {
+            JsonElement own = readJson(DEFAULT_FONT);
+            if (own != null && own.isJsonObject() && own.getAsJsonObject().has("providers")) {
+                for (JsonElement p : own.getAsJsonObject().getAsJsonArray("providers")) {
+                    if (!p.isJsonObject()) {
+                        continue;
+                    }
+                    JsonObject provider = p.getAsJsonObject();
+                    if (provider.has("chars") && provider.get("chars").isJsonArray()) {
+                        provider.getAsJsonArray("chars").forEach(r -> r.getAsString().codePoints().filter(c -> c != 0).forEach(taken::add));
+                    }
+                    if (provider.has("advances") && provider.get("advances").isJsonObject()) {
+                        provider.getAsJsonObject("advances").keySet().forEach(k -> k.codePoints().forEach(taken::add));
+                    }
+                }
+            }
+        }
+        List<JsonObject> pages = fonts.implicitPages(taken::contains);
         if (pages.isEmpty()) {
             return;
         }

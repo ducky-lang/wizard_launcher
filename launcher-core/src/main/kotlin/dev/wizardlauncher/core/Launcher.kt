@@ -2,6 +2,7 @@ package dev.wizardlauncher.core
 
 import dev.wizardlauncher.core.auth.Account
 import dev.wizardlauncher.core.auth.AccountManager
+import dev.wizardlauncher.core.game.ModConfigs
 import dev.wizardlauncher.core.game.ClientRunner
 import dev.wizardlauncher.core.game.GameOptions
 import dev.wizardlauncher.core.game.ProcessSupervisor
@@ -84,6 +85,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             val versionId = game.ensure(modpack.loaderVersion())
             stage(2)
             modpack.ensure()
+            ModConfigs.enforce(paths.gameDir)
             val clientWaitsForWorld = content.ensureLegacyPackSupport()
             val packName = runCatching { content.ensureResourcePack() }
                 .onFailure { Log.error("The resource pack could not be installed; continuing without it: ${it.message}", it) }
@@ -151,6 +153,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             modpack.ensure()
             content.ensureLegacyPackSupport()
         }
+        ModConfigs.enforce(paths.gameDir)
         val loader = modpack.loaderVersion()
         val missing = game.missingFiles(loader)
         val java = JavaLocator.find(settings, catalog.minecraft.requiredJava)
@@ -217,12 +220,15 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             it.contains("WizardLegacyPacks") || it.contains("Reloading ResourceManager") || it.contains("resource pack", ignoreCase = true) ||
                 (packName != null && it.contains(packName))
         }.take(25)
+        val culling = runCatching { Files.readAllLines(paths.gameDir.resolve("config").resolve("moreculling.toml")) }.getOrDefault(emptyList())
+            .any { it.replace(" ", "") == "useBlockStateCulling=false" }
         val brokenModels = if (packName == null) emptyList() else text.lines().filter {
             BROKEN_MODEL.containsMatchIn(it) && LEGACY_MODEL_IDS.containsMatchIn(it)
         }.take(10)
         return buildString {
             appendLine("Client was ${if (alive) "running" else "not running (exit ${runCatching { client.exitValue() }.getOrDefault(-1)})"} at the end of the test")
             markers.keys.forEach { appendLine((if (it in seen) "[ok] " else "[--] ") + it) }
+            appendLine((if (culling) "[ok] " else "[--] ") + "Culling matches vanilla for remodelled blocks")
             if (packName != null) {
                 appendLine((if (brokenModels.isEmpty()) "[ok] " else "[--] ") + "Legacy door, vine and fire models load cleanly")
                 brokenModels.forEach { appendLine("  $it") }

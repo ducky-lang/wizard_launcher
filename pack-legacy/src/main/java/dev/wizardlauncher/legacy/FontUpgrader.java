@@ -15,8 +15,6 @@ import javax.imageio.ImageIO;
 final class FontUpgrader {
     static final String LEGACY_TEMPLATE = "minecraft:font/unicode_page_%s.png";
     static final String LEGACY_SIZES = "assets/minecraft/font/glyph_sizes.bin";
-    static final int FIRST_PRIVATE_PAGE = 0xe0;
-    static final int LAST_PRIVATE_PAGE = 0xf8;
 
     private final PackView pack;
     private final Overlay overlay;
@@ -56,7 +54,7 @@ final class FontUpgrader {
                     sizes = pack.read(sizesPath);
                 }
             }
-            for (JsonObject converted : convertPages(template, sizes, fontPath, page -> true)) {
+            for (JsonObject converted : convertPages(template, sizes, fontPath, page -> true, codepoint -> true)) {
                 out.add(converted);
             }
         }
@@ -68,20 +66,20 @@ final class FontUpgrader {
         return provider.has("type") ? provider.get("type").getAsString() : "";
     }
 
-    List<JsonObject> implicitPages() throws IOException {
+    List<JsonObject> implicitPages(IntPredicate taken) throws IOException {
         boolean any = false;
-        for (int page = FIRST_PRIVATE_PAGE; page <= LAST_PRIVATE_PAGE && !any; page++) {
+        for (int page = 0; page < 256 && !any; page++) {
             any = pack.exists(String.format("assets/minecraft/textures/font/unicode_page_%02x.png", page));
         }
         if (!any) {
             return List.of();
         }
         byte[] sizes = pack.exists(LEGACY_SIZES) ? pack.read(LEGACY_SIZES) : null;
-        return convertPages(LEGACY_TEMPLATE, sizes, "assets/minecraft/font/default.json (private use glyphs)",
-            page -> page >= FIRST_PRIVATE_PAGE && page <= LAST_PRIVATE_PAGE);
+        return convertPages(LEGACY_TEMPLATE, sizes, "assets/minecraft/font/default.json (1.16.5 unicode pages)",
+            page -> true, codepoint -> !taken.test(codepoint));
     }
 
-    private List<JsonObject> convertPages(String template, byte[] sizes, String fontPath, IntPredicate include) throws IOException {
+    private List<JsonObject> convertPages(String template, byte[] sizes, String fontPath, IntPredicate include, IntPredicate wanted) throws IOException {
         String ns = Res.namespace(template);
         String pattern = Res.path(template);
         List<JsonObject> result = new ArrayList<>();
@@ -113,6 +111,10 @@ final class FontUpgrader {
                 StringBuilder line = new StringBuilder();
                 for (int col = 0; col < 16; col++) {
                     int codepoint = page * 256 + row * 16 + col;
+                    if (!wanted.test(codepoint)) {
+                        line.append('\u0000');
+                        continue;
+                    }
                     int size = sizes != null && codepoint < sizes.length ? sizes[codepoint] & 0xFF : -1;
                     int start = size > 0 ? size >>> 4 : 0;
                     int end = size > 0 ? size & 0xF : 15;
