@@ -18,6 +18,26 @@ import org.junit.jupiter.api.io.TempDir
 class ClientRunnerTest {
     @TempDir lateinit var tmp: Path
 
+    @Test fun `resource pack models never decide what More Culling hides`() {
+        val game = tmp.resolve("game")
+        val config = game.resolve("config/moreculling.toml")
+        dev.wizardlauncher.core.game.GameOptions.disableModelCulling(game)
+        assertFalse(Files.exists(config))
+
+        Files.createDirectories(game.resolve("mods"))
+        Files.writeString(game.resolve("mods/moreculling-1.20.1-0.19.0.jar"), "jar")
+        dev.wizardlauncher.core.game.GameOptions.disableModelCulling(game)
+        assertEquals(listOf("useBlockStateCulling = false"), Files.readAllLines(config))
+
+        Files.write(config, listOf("cloudCulling = true", "useBlockStateCulling = true", "", "[modCompatibility]", "minecraft = true"))
+        dev.wizardlauncher.core.game.GameOptions.disableModelCulling(game)
+        assertEquals(listOf("cloudCulling = true", "useBlockStateCulling = false", "", "[modCompatibility]", "minecraft = true"), Files.readAllLines(config))
+
+        Files.write(config, listOf("cloudCulling = true", "[modCompatibility]", "minecraft = true"))
+        dev.wizardlauncher.core.game.GameOptions.disableModelCulling(game)
+        assertEquals(listOf("cloudCulling = true", "useBlockStateCulling = false", "[modCompatibility]", "minecraft = true"), Files.readAllLines(config))
+    }
+
     @Test fun `the classpath holds whole files, never path segments`() {
         val paths = AppPaths(tmp.resolve("Users/Harry Potter/AppData/Local/WizardLauncher")).ensure()
         val lib = Library("org.example:lib:1.0", "org/example/lib/1.0/lib-1.0.jar", "https://libraries.minecraft.net/x", null)

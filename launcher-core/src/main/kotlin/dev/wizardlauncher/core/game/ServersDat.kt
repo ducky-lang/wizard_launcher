@@ -102,6 +102,24 @@ object GameOptions {
         Files.write(optionsFile, lines)
     }
 
+    fun disableModelCulling(gameDir: Path) {
+        val mods = gameDir.resolve("mods")
+        val installed = Files.isDirectory(mods) && Files.list(mods).use { s ->
+            s.anyMatch { it.fileName.toString().lowercase().let { n -> n.startsWith("moreculling") && n.endsWith(".jar") } }
+        }
+        val file = gameDir.resolve("config").resolve("moreculling.toml")
+        if (!installed && !Files.isRegularFile(file)) return
+        val lines = if (Files.isRegularFile(file)) Files.readAllLines(file).toMutableList() else mutableListOf()
+        val line = "useBlockStateCulling = false"
+        val idx = lines.indexOfFirst { it.trimStart().startsWith("useBlockStateCulling") }
+        when {
+            idx >= 0 -> if (lines[idx].trim() == line) return else lines[idx] = line
+            else -> lines.add(lines.indexOfFirst { it.trimStart().startsWith("[") }.takeIf { it >= 0 } ?: lines.size, line)
+        }
+        Files.createDirectories(file.parent)
+        Files.write(file, lines)
+    }
+
     private fun parseList(raw: String): MutableList<String> =
         Regex("\"((?:[^\"\\\\]|\\\\.)*)\"").findAll(raw).map { it.groupValues[1].replace("\\\"", "\"") }.toMutableList()
 }

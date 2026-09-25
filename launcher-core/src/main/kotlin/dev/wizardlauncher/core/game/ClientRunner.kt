@@ -76,6 +76,7 @@ class ClientRunner(
         val command = plan.command
         val game = plan.gameArgs
         GameOptions.setFullscreen(paths.gameDir.resolve("options.txt"), settings.fullscreen)
+        GameOptions.disableModelCulling(paths.gameDir)
         Log.file("Client command: " + command.joinToString(" ") { if (it.length > 300) it.take(80) + "...(${it.length} chars)" else it })
         val output = paths.logs.resolve("client-output.log").toFile()
         val process = ProcessBuilder(command)
