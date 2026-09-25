@@ -1,0 +1,41 @@
+name: Probe
+on: { push: { branches: ["claude/pack-probe"] } }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -sSL -o rp.zip "https://huggingface.co/datasets/Foxybeo/wz_launcher/resolve/main/Resource%20Pack.zip?download=true"
+          curl -sSL -o fo.mrpack "https://cdn.modrinth.com/data/1KVo5zza/versions/2ZbcYfCj/Fabulously.Optimized-5.4.1.mrpack"
+          pip install pillow >/dev/null
+          python3 - <<'PY'
+          import zipfile, json, io, re
+          from PIL import Image
+          z = zipfile.ZipFile("rp.zip")
+          names = z.namelist()
+          print("ENTRIES", len(names))
+          root = min((n.split("assets/")[0] for n in names if "/assets/" in "/" + n), key=len)
+          print("ROOT", repr(root))
+          for n in names:
+              if n.endswith("pack.mcmeta") and n.count("/") <= 1: print("MCMETA", n, z.read(n)[:300])
+          hits = [n for n in names if re.search(r"campfire|soul_fire|fire_[0-9]|/fire\.json|template_campfire", n)]
+          for n in hits:
+              d = z.read(n)
+              if n.endswith((".json", ".mcmeta", ".properties")):
+                  print("FILE", n); print(d.decode("utf-8", "replace")[:3000])
+              elif n.endswith(".png"):
+                  im = Image.open(io.BytesIO(d)).convert("RGBA"); a = [p[3] for p in im.getdata()]
+                  print("PNG", n, im.size, "alpha0", sum(1 for x in a if x == 0), "partial", sum(1 for x in a if 0 < x < 255), "opaque", sum(1 for x in a if x == 255))
+              else: print("OTHER", n, len(d))
+          refs = []
+          for n in names:
+              if n.endswith(".json") and ("/models/" in n or "/blockstates/" in n):
+                  t = z.read(n).decode("utf-8", "replace")
+                  if "campfire" in t and n not in hits: refs.append(n)
+          print("REFERENCING", refs[:40])
+          for n in refs[:15]: print("FILE", n); print(z.read(n).decode("utf-8","replace")[:2000])
+          m = zipfile.ZipFile("fo.mrpack"); idx = json.loads(m.read("modrinth.index.json"))
+          print("MODS", sorted(f["path"] for f in idx["files"]))
+          for n in m.namelist():
+              if "moreculling" in n.lower() or "sodium" in n.lower(): print("OVR", n); print(m.read(n).decode("utf-8","replace")[:1500])
+          PY
