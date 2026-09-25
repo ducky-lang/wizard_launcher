@@ -1,29 +1,32 @@
-## Wizard Launcher 2.0.1 · Performance Update
+## Wizard Launcher 2.0.2 · Legacy Blocks & Motion
 
-Faster Play, a lighter launcher, and legacy resource packs that load reliably and stay out of the game's way.
+1.16.5 resource packs now show doors, vines, fire, sounds and custom glyphs the way 1.16.5 did, and the launcher moves with a new, lightweight motion system.
 
-### Faster Play
+### Legacy packs, read like 1.16.5
 
-- **The world and Minecraft start together.** The world server now boots while Minecraft loads instead of before it. Minecraft waits on an *Opening the castle gates…* screen and joins the moment the world is ready, with no second click. If the world fails to start, the game is closed and the error is shown in the launcher.
-- **Resource packs are cached.** A 1.16.5 pack is adapted once, then cached in memory and on disk. The cache is keyed by the pack's files and the adapter version, so later launches reuse it and any change to the pack is picked up automatically.
+- **Doors and vines.** 1.20 redrew every door with new models, and 1.17 replaced the vine face models. When a pack draws iron doors, wooden doors or vines with the old models, the 1.16.5 block states come back, so the pack's own models are shown.
+- **Soul fire, torches and lanterns.** 79 models were removed from the game after 1.16.5, including `door_bottom`, `fire_floor`, `torch_wall` and `hanging_lantern`. Any pack model built on one of them gets the 1.16.5 original, so custom shapes keep their form.
+- **Sounds.** Door and chest events switched to new files in later versions. Replaced 1.16.5 sound files play again, and the renamed sweet berry event is moved to its new name.
+- **Custom glyphs.** Characters drawn on the private use unicode pages (`unicode_page_e0` to `f8`) keep showing even though 1.20 dropped those pages. Glyph widths are measured from the pixels when `glyph_sizes.bin` is missing.
+- **Player skins.** `steve.png` and `alex.png` are served from the folders 1.19.3 moved them to.
 
-### Legacy packs that just work
+### A launcher that moves
 
-- **Adaptation runs in the background.** It used to run on the game's main thread, which could hold back network replies long enough for the world to drop the player with *Timed out* on large packs such as the castle's 10,000-file pack. It now runs on a background thread.
-- **A single bad file no longer breaks the pack.** A file the game lists but cannot read used to stop the whole pack from being adapted, so it loaded unchanged. That file is now skipped with a note in the pack report, and the rest of the pack is adapted.
+- Pages glide in from the direction you travel, and the title follows.
+- The sidebar and home art reveal on start, and the menu indicator and tabs move on springs.
+- Cards lift with a light that follows the pointer.
+- The Play button ripples when pressed, shines on hover and pulses when the game starts.
+- Launch steps pop as they complete, progress and memory bars grow smoothly, and numbers roll to their values.
+- Dialogs, menus, notifications (now with a timer bar) and the first-run guide move with direction.
 
-### A lighter launcher
-
-- **No more heavy effects.** The full-screen particle canvas, the blurred aurora, the frosted-glass panels and the looping glow effects are gone. The window no longer redraws on every frame while idle, so it uses far less CPU and GPU. Page transitions and small, GPU-friendly motion stay.
-- **The console keeps up.** It receives log lines in batches instead of one call per line, so heavy output no longer stutters the window.
-- **New home banner.** It now shows the castle from the map's own resource pack.
+Every animation runs once and uses only GPU-friendly properties, so nothing animates while the launcher is idle and the 2.0.1 performance gains stay. *Settings → Animations* and the system's reduced-motion setting turn motion off.
 
 ### Downloads
 
 | System | File |
 |---|---|
-| Windows 10/11 (64-bit) | `WizardLauncher-Windows-Setup-2.0.1.exe` |
+| Windows 10/11 (64-bit) | `WizardLauncher-Windows-Setup-2.0.2.exe` |
 | macOS (Apple silicon) | `WizardLauncher-macOS.dmg` |
 | Linux (x86_64) | `WizardLauncher-Linux-x86_64.AppImage` |
 
-Each installer includes its own Java runtime. Install over 2.0.0 to update; your worlds, accounts and settings are kept. Verify downloads against `SHA256SUMS.txt`.
+Each installer includes its own Java runtime. Install over 2.0.1 to update; your worlds, accounts and settings are kept. Verify downloads against `SHA256SUMS.txt`.
