@@ -46,9 +46,9 @@
     const icon = kind === "ok" ? ICONS.check : kind === "err" ? ICONS.alert : ICONS.info;
     const el = document.createElement("div");
     el.className = "toast " + kind;
-    el.innerHTML = `${icon}<div><b>${esc(title)}</b>${body ? `<span>${esc(body)}</span>` : ""}</div>`;
-    $("#toasts").appendChild(el);
     const life = kind === "err" ? 7000 : 3600;
+    el.innerHTML = `${icon}<div><b>${esc(title)}</b>${body ? `<span>${esc(body)}</span>` : ""}</div><i class="life" style="animation-duration:${life}ms"></i>`;
+    $("#toasts").appendChild(el);
     setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, life);
   }
 
@@ -107,6 +107,7 @@
       b.dataset.page = id;
       b.innerHTML = `${ICONS[icon]}<span>${t("nav." + id)}</span>`;
       b.title = `${t("nav." + id)}  (Ctrl+${i + 1})`;
+      b.style.setProperty("--i", i);
       b.addEventListener("click", () => go(id));
       nav.appendChild(b);
     });
@@ -122,13 +123,24 @@
   }
 
   function go(page) {
+    const prev = state.page;
+    const order = PAGES.map(([id]) => id);
+    const changed = prev !== page;
     state.page = page;
     $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
     $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + page));
     $("#pageTitle").textContent = t("nav." + page);
     $("#pageSubtitle").textContent = t("sub." + page);
+    const el = $("#page-" + page);
+    const seen = !!rendered[page];
+    if (changed && el) {
+      el.style.setProperty("--dir", prev && order.indexOf(page) < order.indexOf(prev) ? -1 : 1);
+      FX.restart(el, "entering");
+      FX.restart($(".title-wrap"), "swap");
+    }
     moveIndicator();
     render(page);
+    if (changed && seen) FX.replay(el);
   }
 
   function render(page, force = false) {
@@ -207,13 +219,14 @@
             </div>
             <p class="muted" id="playHint" style="margin:12px 0 0"></p>
             <div class="launch" id="launch">
-              <div class="bar" id="launchBar"><i></i></div>
+              <div class="bar fx" id="launchBar"><i></i></div>
               <div class="launch-status"><b id="launchMsg"></b><span id="launchPct"></span></div>
               <div class="steps" id="steps">${["prepare", "game", "mods", "portal", "launch"].map((s) => `<span>${t("step." + s)}</span>`).join("")}</div>
             </div>
           </div>
         </section>
         <div class="grid cols-3 stagger" id="homeCards"></div>`;
+      rendered.homeCards = false;
       bindHeroArt();
       $("#playBtn").addEventListener("click", onPlay);
       $("#stopBtn").addEventListener("click", () => call("game.stop"));
@@ -231,6 +244,9 @@
     const mem = info.memory || {};
     const total = mem.totalMb || 8192;
     const pct = (v) => Math.min(100, Math.round((v / total) * 100));
+    const intro = !rendered.homeCards;
+    rendered.homeCards = true;
+    box.classList.toggle("settled", !intro);
     box.innerHTML = `
       <div class="card hover">
         <h3>${ICONS.castle}${t("card.world")}</h3>
@@ -243,9 +259,9 @@
       </div>
       <div class="card hover">
         <h3>${ICONS.memory}${t("card.performance")}</h3>
-        <div class="mem">
-          <div class="mem-row"><span>${t("perf.game")}</span><div class="bar"><i style="width:${pct(mem.clientMb)}%"></i></div><em>${mem.clientMb || 0} MB</em></div>
-          <div class="mem-row"><span>${t("perf.world")}</span><div class="bar"><i style="width:${pct(mem.serverMb)}%;background:linear-gradient(90deg,#6f5ce0,#b3a6ff)"></i></div><em>${mem.serverMb || 0} MB</em></div>
+        <div class="mem${intro ? " intro" : ""}">
+          <div class="mem-row"><span>${t("perf.game")}</span><div class="bar"><i style="width:${pct(mem.clientMb)}%"></i></div><em data-num="client" data-to="${mem.clientMb || 0}">${mem.clientMb || 0} MB</em></div>
+          <div class="mem-row"><span>${t("perf.world")}</span><div class="bar"><i style="width:${pct(mem.serverMb)}%;background:linear-gradient(90deg,#6f5ce0,#b3a6ff)"></i></div><em data-num="server" data-to="${mem.serverMb || 0}">${mem.serverMb || 0} MB</em></div>
           <div class="mem-row"><span>${t("perf.system")}</span><div class="bar"><i style="width:100%;background:rgba(255,255,255,.18);box-shadow:none"></i></div><em>${Math.round(total / 1024)} GB</em></div>
         </div>
         <div class="row" style="margin-top:14px"><span class="tag gold">${t("perf.profile")}: ${t("set.profile." + String((state.settings || {}).memory_profile || "BALANCED").toLowerCase())}</span></div>
@@ -259,6 +275,8 @@
         <h3>${ICONS.sparkle}${t("card.news")} · ${esc(info.version || "")}</h3>
         <ul>${[1, 2, 3, 4, 5].map((i) => `<li>${ICONS.check}<span>${t("news." + i)}</span></li>`).join("")}</ul>
       </div>`;
+    $$(".card.hover", box).forEach(FX.spotlight);
+    $$("[data-num]", box).forEach((e) => FX.countUp(e, "mem." + e.dataset.num, Number(e.dataset.to), (v) => v + " MB"));
     $("#homeBackup").addEventListener("click", async () => {
       await call("worlds.backup"); toast("ok", t("toast.backup")); await refreshInfo();
     });
@@ -271,15 +289,24 @@
     const busy = g.state === "installing" || g.state === "launching";
     btn.classList.toggle("busy", busy);
     btn.classList.toggle("playing", g.state === "playing");
-    $(".pl", btn).textContent = playLabel();
-    $(".pi", btn).innerHTML = busy ? '<span class="spinner"></span>' : g.state === "playing" ? ICONS.check : ICONS.play;
+    const label = playLabel();
+    const iconKind = busy ? "busy" : g.state === "playing" ? "playing" : "idle";
+    if ($(".pl", btn).textContent !== label) {
+      $(".pl", btn).textContent = label;
+      FX.restart($(".pl", btn), "swap");
+    }
+    if (btn.dataset.icon !== iconKind) {
+      btn.dataset.icon = iconKind;
+      $(".pi", btn).innerHTML = busy ? '<span class="spinner"></span>' : g.state === "playing" ? ICONS.check : ICONS.play;
+      FX.restart($(".pi", btn), "swap");
+    }
     $("#stopBtn").hidden = !(g.state === "playing" || busy);
     const launch = $("#launch");
     launch.classList.toggle("show", busy);
     if (busy) {
       const bar = $("#launchBar");
       bar.classList.toggle("indeterminate", g.fraction == null);
-      if (g.fraction != null) $("i", bar).style.width = Math.round(g.fraction * 100) + "%";
+      if (g.fraction != null) $("i", bar).style.setProperty("--f", Math.max(0, Math.min(1, g.fraction)).toFixed(4));
       $("#launchMsg").textContent = g.message || "";
       $("#launchPct").textContent = g.fraction != null ? Math.round(g.fraction * 100) + "%" : "";
       $$("#steps span").forEach((s, i) => { s.classList.toggle("on", i === g.step); s.classList.toggle("done", i < g.step); });
@@ -288,8 +315,9 @@
     $("#playHint").textContent = g.state === "idle" ? (info.offlineReady ? t("play.hint.ready") : t("play.hint.first", { gb: info.downloadGb || 3 })) : "";
   }
 
-  async function onPlay() {
+  async function onPlay(e) {
     if (state.game.state !== "idle" && state.game.state !== "error") return;
+    FX.ripple($("#playBtn"), e);
     if (!state.selected) { openAccountMenu(); return; }
     state.game = { state: "launching", fraction: null, message: "", step: 0 };
     updatePlay();
@@ -349,7 +377,9 @@
       list.innerHTML = `<div class="empty">${ICONS.sparkle}<div>${t("lib.empty." + state.libTab)}</div></div>`;
       return;
     }
-    list.className = "list stagger";
+    const fresh = list.dataset.tab !== state.libTab;
+    list.dataset.tab = state.libTab;
+    list.className = "list stagger" + (fresh ? "" : " settled");
     if (state.libTab === "mods") {
       list.innerHTML = items.map((m) => `
         <div class="item ${m.enabled ? "" : "off"}">
@@ -384,7 +414,7 @@
     $$("[data-remove]", list).forEach((b) => b.addEventListener("click", async () => {
       if (!(await confirmBox(t("lib.removeConfirm", { name: b.dataset.remove }), "", true))) return;
       await call(state.libTab + ".remove", { name: b.dataset.remove });
-      renderLibraryList();
+      FX.leave(b.closest(".item"), () => renderLibraryList());
     }));
     $$("[data-export]", list).forEach((b) => b.addEventListener("click", async () => {
       const r = await call("packs.export", { name: b.dataset.export });
@@ -734,7 +764,7 @@
     let profile = state.settings.memory_profile || "BALANCED";
     const m = modal('<div class="onb" id="onb"></div>', { onClose: () => call("settings.set", { onboarding_done: true }) });
     const icons = ["wand", "globe", "user", "memory", "sparkle"];
-    const draw = () => {
+    const draw = (dir = 0) => {
       const n = step + 1;
       let extra = "";
       if (step === 1) extra = `<div class="choice">${[["en", "English", "The castle speaks English"], ["vi", "Tiếng Việt", "Lâu đài nói tiếng Việt"]].map(([v, a, b]) => `<button data-lang="${v}" class="${lang === v ? "sel" : ""}">${ICONS.globe}<div><b>${a}</b><span>${b}</span></div></button>`).join("")}</div>`;
@@ -744,10 +774,11 @@
         <div class="actions" style="justify-content:space-between"><button class="ghost" data-nav="back" ${step === 0 ? "style='visibility:hidden'" : ""}>${t("btn.back")}</button>
         <button class="btn" data-nav="next">${step === 4 ? t("btn.start") : t("btn.next")}</button></div>
         <div class="dots">${[0, 1, 2, 3, 4].map((i) => `<i class="${i === step ? "on" : ""}"></i>`).join("")}</div>`;
+      if (dir) FX.restart($("#onb", m), dir > 0 ? "next" : "back");
       $$("[data-lang]", m).forEach((b) => b.addEventListener("click", () => { lang = b.dataset.lang; call("settings.set", { language: lang }); relabel(); draw(); }));
       $$("[data-acct]", m).forEach((b) => b.addEventListener("click", () => (b.dataset.acct === "ms" ? microsoftLogin(draw) : offlineLogin(draw))));
       $$("[data-prof]", m).forEach((b) => b.addEventListener("click", () => { profile = b.dataset.prof; call("settings.set", { memory_profile: profile }); draw(); }));
-      $('[data-nav="back"]', m).addEventListener("click", () => { step = Math.max(0, step - 1); draw(); });
+      $('[data-nav="back"]', m).addEventListener("click", () => { step = Math.max(0, step - 1); draw(-1); });
       $('[data-nav="next"]', m).addEventListener("click", async () => {
         if (step === 4) {
           m.close();
@@ -756,7 +787,7 @@
           render("home", true);
           return;
         }
-        step++; draw();
+        step++; draw(1);
       });
     };
     draw();
@@ -788,6 +819,7 @@
     WL.on("launch.state", (d) => {
       const prev = state.game.state;
       state.game = Object.assign({}, state.game, d);
+      if (d.state === "playing" && prev !== "playing") FX.pulse($("#playBtn"));
       if (d.state === "idle" && prev === "playing") toast("info", t("toast.gameClosed"));
       if (d.state === "error" && d.message) { toast("err", t("toast.error"), d.message); state.game.state = "idle"; }
       updatePlay(); renderChips();

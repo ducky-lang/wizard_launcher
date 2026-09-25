@@ -135,6 +135,11 @@ The castle's resource pack was made for **1.16.5** (`pack_format` 6). Instead of
 | `grass_path` became `dirt_path`; squid, cauldron and glint textures moved (1.17–1.19.4) | Aliases and reference rewrites; the cauldron's `level` states are split into `cauldron` and `water_cauldron` |
 | 1.20 removed the `legacy_unicode` font provider (custom GUI glyphs) | Pages become `bitmap` providers cropped by `glyph_sizes.bin`; blank sized glyphs become `space` advances |
 | 1.17 post shaders require GLSL 150 | `attribute`/`varying`, `gl_FragColor` and `texture2D` are upgraded |
+| 1.20 redrew doors with `*_left`/`*_right` models, and 1.17 replaced the vine face models with one `vine` model | When a pack draws doors or vines with the old models, the 1.16.5 block states come back, so the pack's own models are shown |
+| 79 models were removed after 1.16.5, including `door_bottom`, `fire_floor`, `torch_wall` and `hanging_lantern` | Any model built on one of them gets the 1.16.5 original, so custom soul fire, torches and lanterns keep their shape |
+| Door and chest sounds switched to new files; `item.sweet_berries.pick_from_bush` was renamed | Events play the pack's replaced 1.16.5 files again, and renamed events are moved |
+| 1.20 dropped the unicode pages from the default font | Private use glyphs drawn on `unicode_page_e0`–`f8` keep showing, with widths measured from the pixels when `glyph_sizes.bin` is missing |
+| Player skins moved to `entity/player/wide` and `slim` in 1.19.3 | `steve.png` and `alex.png` are served from the new folders |
 | Older `pack_format` is flagged *incompatible* | The pack is listed as compatible |
 
 Any pack from **1.13 to 1.19.4** benefits, with rules gated by the version each change arrived in. A report for every pack is written to `logs/wizard-legacy-packs/`.
