@@ -18,24 +18,32 @@ jobs:
           print("ROOT", repr(root))
           for n in names:
               if n.endswith("pack.mcmeta") and n.count("/") <= 1: print("MCMETA", n, z.read(n)[:300])
-          hits = [n for n in names if re.search(r"campfire|soul_fire|fire_[0-9]|/fire\.json|template_campfire", n)]
-          for n in hits:
+          def show(n):
               d = z.read(n)
-              if n.endswith((".json", ".mcmeta", ".properties")):
-                  print("FILE", n); print(d.decode("utf-8", "replace")[:3000])
-              elif n.endswith(".png"):
+              if n.endswith(".png"):
                   im = Image.open(io.BytesIO(d)).convert("RGBA"); a = [p[3] for p in im.getdata()]
                   print("PNG", n, im.size, "alpha0", sum(1 for x in a if x == 0), "partial", sum(1 for x in a if 0 < x < 255), "opaque", sum(1 for x in a if x == 255))
-              else: print("OTHER", n, len(d))
-          refs = []
-          for n in names:
-              if n.endswith(".json") and ("/models/" in n or "/blockstates/" in n):
-                  t = z.read(n).decode("utf-8", "replace")
-                  if "campfire" in t and n not in hits: refs.append(n)
-          print("REFERENCING", refs[:40])
-          for n in refs[:15]: print("FILE", n); print(z.read(n).decode("utf-8","replace")[:2000])
-          m = zipfile.ZipFile("fo.mrpack"); idx = json.loads(m.read("modrinth.index.json"))
-          print("MODS", sorted(f["path"] for f in idx["files"]))
-          for n in m.namelist():
-              if "moreculling" in n.lower() or "sodium" in n.lower(): print("OVR", n); print(m.read(n).decode("utf-8","replace")[:1500])
+              else:
+                  print("FILE", n); print(d.decode("utf-8", "replace")[:4000])
+          ms = [n for n in names if "models/block/locked_door" in n]
+          print("LOCKED", ms)
+          seen = set()
+          def model(ref):
+              ref = ref.replace("minecraft:", "")
+              n = "assets/minecraft/models/" + ref + ".json"
+              if n in seen or n not in names: 
+                  if n not in names: print("NOTINPACK", n)
+                  return
+              seen.add(n); show(n)
+              j = json.loads(z.read(n).decode("utf-8","replace"))
+              for t in (j.get("textures") or {}).values():
+                  if not t.startswith("#"):
+                      tn = "assets/minecraft/textures/" + t.replace("minecraft:","") + ".png"
+                      if tn in names: show(tn)
+                      else: print("TEXNOTINPACK", tn)
+              if "parent" in j: model(j["parent"])
+          for n in ms: model(n[len("assets/minecraft/models/"):-5])
+          for b in ["oak_door", "birch_door", "iron_door"]:
+              n = "assets/minecraft/blockstates/" + b + ".json"
+              if n in names: show(n)
           PY
