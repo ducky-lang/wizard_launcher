@@ -10,6 +10,10 @@
 - **Custom glyphs.** Characters drawn on the private use unicode pages (`unicode_page_e0` to `f8`) keep showing even though 1.20 dropped those pages. Glyph widths are measured from the pixels when `glyph_sizes.bin` is missing.
 - **Player skins.** `steve.png` and `alex.png` are served from the folders 1.19.3 moved them to.
 
+### Fixed
+
+- **No more seeing through remodelled blocks.** The castle pack draws campfires and soul campfires as locked doors with glass tops. The modpack's MoreCulling treated those models as solid and hid the blocks next to them, so the world behind showed through. The launcher now keeps MoreCulling's model-based block culling off, so these blocks cull exactly like 1.16.5 and vanilla 1.20.1.
+
 ### A launcher that moves
 
 - Pages glide in from the direction you travel, and the title follows.
