@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- **Map text no longer shows as `'''''`.** The castle pack redraws characters on `unicode_page_02`, which 1.16.5 read through its built-in unicode font and 1.20 no longer has, so those characters fell back to apostrophe-like marks. Every unicode page a pack overrides is now served again, for exactly the characters 1.16.5 took from it.
 - **No more seeing through remodelled blocks.** The castle pack draws campfires and soul campfires as locked doors with glass tops. The modpack's MoreCulling treated those models as solid and hid the blocks next to them, so the world behind showed through. The launcher now keeps MoreCulling's model-based block culling off, so these blocks cull exactly like 1.16.5 and vanilla 1.20.1.
 
 ### A launcher that moves

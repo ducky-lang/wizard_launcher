@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -21,6 +22,7 @@ final class LegacyVanilla {
     final Map<String, String> renamedSounds = new LinkedHashMap<>();
     final Map<String, JsonObject> legacySounds = new LinkedHashMap<>();
     final Map<String, Set<String>> currentSoundFiles = new LinkedHashMap<>();
+    final Set<Integer> bitmapChars = new HashSet<>();
 
     private LegacyVanilla(JsonObject root) {
         root.getAsJsonObject("models").entrySet().forEach(e -> models.put(e.getKey(), e.getValue().getAsJsonObject()));
@@ -34,6 +36,7 @@ final class LegacyVanilla {
             event.getAsJsonArray("current").forEach(n -> current.add(n.getAsString()));
             currentSoundFiles.put(e.getKey(), Collections.unmodifiableSet(current));
         }
+        root.getAsJsonObject("font").get("bitmap_chars").getAsString().codePoints().forEach(bitmapChars::add);
     }
 
     static LegacyVanilla get() {
