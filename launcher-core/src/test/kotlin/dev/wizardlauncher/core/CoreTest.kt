@@ -2,6 +2,7 @@ package dev.wizardlauncher.core
 
 import com.google.gson.JsonParser
 import dev.wizardlauncher.core.game.GameOptions
+import dev.wizardlauncher.core.game.ModConfigs
 import dev.wizardlauncher.core.game.OfflineUuid
 import dev.wizardlauncher.core.game.ServersDat
 import dev.wizardlauncher.core.install.InstallState
@@ -176,5 +177,22 @@ class CoreTest {
         assertEquals("1.20.1", c.minecraft.clientVersion)
         assertEquals("hosted", c.server.mode)
         assertEquals(6, c.resource("resource_pack").convertFrom)
+    }
+
+    @Test fun `model based culling is switched off so remodelled blocks cull like vanilla`() {
+        val game = tmp.resolve("game")
+        val defaults = game.resolve("config/yosbr/config/moreculling.toml")
+        Files.createDirectories(defaults.parent)
+        Files.write(defaults, listOf("cloudCulling = true", "useBlockStateCulling = true", "", "[modCompatibility]", "minecraft = true"))
+        ModConfigs.enforce(game)
+        val live = Files.readAllLines(game.resolve("config/moreculling.toml"))
+        assertTrue("useBlockStateCulling = false" in live)
+        assertTrue("cloudCulling = true" in live)
+        assertTrue(live.indexOf("useBlockStateCulling = false") < live.indexOf("[modCompatibility]"))
+        assertTrue("useBlockStateCulling = false" in Files.readAllLines(defaults))
+        Files.write(game.resolve("config/moreculling.toml"), listOf("[modCompatibility]", "minecraft = true"))
+        ModConfigs.enforce(game)
+        assertEquals("useBlockStateCulling = false", Files.readAllLines(game.resolve("config/moreculling.toml")).first())
+        assertFalse(ModConfigs.patchToml(game.resolve("config/moreculling.toml"), mapOf("useBlockStateCulling" to "false")))
     }
 }
