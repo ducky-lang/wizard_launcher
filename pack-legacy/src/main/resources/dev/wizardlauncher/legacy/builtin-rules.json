@@ -94,6 +94,14 @@
         {
           "from": "assets/minecraft/textures/misc/enchanted_item_glint.png",
           "to": "assets/minecraft/textures/misc/enchanted_glint_item.png"
+        },
+        {
+          "from": "assets/minecraft/textures/entity/steve.png",
+          "to": "assets/minecraft/textures/entity/player/wide/steve.png"
+        },
+        {
+          "from": "assets/minecraft/textures/entity/alex.png",
+          "to": "assets/minecraft/textures/entity/player/slim/alex.png"
         }
       ]
     }

@@ -76,6 +76,10 @@ jobs:
               "assets/minecraft/models/item/stick.json": json.dumps({"parent": "item/generated", "textures": {"layer0": "wizard:custom/wand"}}),
               "assets/minecraft/textures/font/unicode_page_e0.png": png(256, 256, (255, 255, 255, 255)),
               "assets/minecraft/font/default.json": json.dumps({"providers": [{"type": "legacy_unicode", "sizes": "minecraft:font/glyph_sizes.bin", "template": "minecraft:font/unicode_page_%s.png"}]}),
+              "assets/minecraft/models/block/iron_door_bottom.json": json.dumps({"parent": "block/door_bottom", "textures": {"bottom": "block/iron_door_bottom", "top": "block/iron_door_top"}}),
+              "assets/minecraft/models/block/vine_1.json": json.dumps({"parent": "block/block", "ambientocclusion": False, "textures": {"particle": "block/vine", "vine": "block/vine"}, "elements": [{"from": [0, 0, 15.2], "to": [16, 16, 15.2], "shade": False, "faces": {"north": {"uv": [16, 0, 0, 16], "texture": "#vine", "tintindex": 0}, "south": {"uv": [0, 0, 16, 16], "texture": "#vine", "tintindex": 0}}}]}),
+              "assets/minecraft/models/block/soul_fire_floor0.json": json.dumps({"parent": "block/fire_floor", "textures": {"particle": "block/soul_fire_0", "fire": "block/soul_fire_0"}}),
+              "assets/minecraft/sounds/block/wooden_door/open.ogg": b"OggS",
           }
           with zipfile.ZipFile("legacy-test-pack.zip", "w") as z:
               for n, d in files.items():

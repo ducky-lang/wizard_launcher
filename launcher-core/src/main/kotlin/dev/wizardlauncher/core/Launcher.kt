@@ -217,9 +217,16 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             it.contains("WizardLegacyPacks") || it.contains("Reloading ResourceManager") || it.contains("resource pack", ignoreCase = true) ||
                 (packName != null && it.contains(packName))
         }.take(25)
+        val brokenModels = if (packName == null) emptyList() else text.lines().filter {
+            BROKEN_MODEL.containsMatchIn(it) && LEGACY_MODEL_IDS.containsMatchIn(it)
+        }.take(10)
         return buildString {
             appendLine("Client was ${if (alive) "running" else "not running (exit ${runCatching { client.exitValue() }.getOrDefault(-1)})"} at the end of the test")
             markers.keys.forEach { appendLine((if (it in seen) "[ok] " else "[--] ") + it) }
+            if (packName != null) {
+                appendLine((if (brokenModels.isEmpty()) "[ok] " else "[--] ") + "Legacy door, vine and fire models load cleanly")
+                brokenModels.forEach { appendLine("  $it") }
+            }
             if (diagnostics.isNotEmpty()) {
                 appendLine("Resource pack lines in latest.log:")
                 diagnostics.forEach { appendLine("  $it") }
@@ -300,6 +307,11 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         )
         return candidates.firstOrNull(Files::isRegularFile)
             ?: throw LauncherException("$name is missing from this installation. Reinstall Wizard Launcher.")
+    }
+
+    private companion object {
+        val BROKEN_MODEL = Regex("Unable to load model|Exception loading blockstate definition|Unable to resolve texture reference|Missing textures in model")
+        val LEGACY_MODEL_IDS = Regex("door|vine|fire_floor|soul_fire")
     }
 }
 

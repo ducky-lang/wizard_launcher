@@ -10,8 +10,11 @@ import com.google.gson.stream.JsonReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,7 +26,7 @@ import java.util.function.Predicate;
 public final class LegacyTranslator {
     public static final int TARGET_FORMAT = 15;
     public static final int OLDEST_FORMAT = 4;
-    public static final int REVISION = 2;
+    public static final int REVISION = 3;
     public static final String PACK_RULES = "wizard-states.json";
     public static final Set<String> VANILLA_TEXTURE_ROOTS = Set.of(
         "entity", "misc", "environment", "gui", "font", "painting", "mob_effect", "particle",
@@ -37,7 +40,12 @@ public final class LegacyTranslator {
     private final Overlay overlay;
     private final Map<String, JsonElement> json = new LinkedHashMap<>();
     private final Map<String, Set<String>> modelTextures = new LinkedHashMap<>();
+    private final Set<String> modelRefs = new LinkedHashSet<>();
     private final Predicate<String> vanilla;
+    private FontUpgrader fonts;
+    private boolean defaultFontHasLegacyPages;
+    private static final String DEFAULT_FONT = "assets/minecraft/font/default.json";
+    private static final String SOUNDS = "assets/minecraft/sounds.json";
 
     private LegacyTranslator(PackView pack, int sourceFormat, Rules rules, Predicate<String> vanilla) {
         this.pack = pack;
@@ -84,19 +92,25 @@ public final class LegacyTranslator {
 
     private void run() throws IOException {
         applyCopies();
+        fonts = new FontUpgrader(pack, overlay);
         for (String ns : pack.namespaces()) {
             for (String path : pack.list(ns, "models")) {
                 if (path.endsWith(".json")) {
                     edit(path, root -> {
                         boolean changed = remapModel(root.getAsJsonObject());
                         modelTextures.put(path, texturesOf(root));
+                        modelRefs.addAll(modelRefsOf(root));
                         return changed;
                     });
                 }
             }
             for (String path : pack.list(ns, "blockstates")) {
                 if (path.endsWith(".json")) {
-                    edit(path, root -> remapBlockstate(root, path));
+                    edit(path, root -> {
+                        boolean changed = remapBlockstate(root, path);
+                        modelRefs.addAll(blockstateRefs(root));
+                        return changed;
+                    });
                 }
             }
             for (String path : pack.list(ns, "lang")) {
@@ -105,10 +119,15 @@ public final class LegacyTranslator {
                 }
             }
             if (sourceFormat < TARGET_FORMAT) {
-                FontUpgrader fonts = new FontUpgrader(pack, overlay);
                 for (String path : pack.list(ns, "font")) {
                     if (path.endsWith(".json")) {
-                        edit(path, root -> fonts.convert(path, root.getAsJsonObject()));
+                        edit(path, root -> {
+                            boolean converted = fonts.convert(path, root.getAsJsonObject());
+                            if (converted && path.equals(DEFAULT_FONT)) {
+                                defaultFontHasLegacyPages = true;
+                            }
+                            return converted;
+                        });
                     }
                 }
             }
@@ -123,6 +142,11 @@ public final class LegacyTranslator {
         applySplits();
         applyDefinedStates();
         applyItemOverrides();
+        restoreLegacyModels();
+        upgradeSounds();
+        if (!defaultFontHasLegacyPages) {
+            addImplicitGlyphPages();
+        }
         if (sourceFormat < 12) {
             generateAtlas();
         }
@@ -562,6 +586,200 @@ public final class LegacyTranslator {
         json.put(atlasPath, atlas);
         overlay.info(atlasPath + ": " + directories.size() + " folder(s) and " + singles.size()
             + " texture(s) added to the block atlas");
+    }
+
+    private void restoreLegacyModels() {
+        LegacyVanilla legacy = LegacyVanilla.get();
+        Set<String> wanted = new LinkedHashSet<>(modelRefs);
+        for (Map.Entry<String, JsonElement> e : json.entrySet()) {
+            if (e.getKey().matches("^assets/[^/]+/blockstates/.+\\.json$")) {
+                wanted.addAll(blockstateRefs(e.getValue()));
+            } else if (e.getKey().matches("^assets/[^/]+/models/.+\\.json$")) {
+                wanted.addAll(modelRefsOf(e.getValue()));
+            }
+        }
+        for (Map.Entry<String, JsonObject> block : legacy.blockstates.entrySet()) {
+            String path = "assets/minecraft/blockstates/" + block.getKey() + ".json";
+            if (provided(path)) {
+                continue;
+            }
+            Set<String> used = blockstateRefs(block.getValue());
+            boolean ownModels = used.stream().anyMatch(id -> legacy.models.containsKey(Res.path(id)) && provided(Res.modelFile(id)));
+            if (!ownModels) {
+                continue;
+            }
+            json.put(path, block.getValue().deepCopy());
+            wanted.addAll(used);
+            overlay.info(path + ": 1.16.5 block states restored so the pack's own models are shown");
+        }
+        Deque<String> queue = new ArrayDeque<>(wanted);
+        Set<String> seen = new HashSet<>();
+        List<String> restored = new ArrayList<>();
+        while (!queue.isEmpty()) {
+            String id = Res.normalize(queue.poll());
+            if (!seen.add(id) || !id.startsWith("minecraft:")) {
+                continue;
+            }
+            JsonObject model = legacy.models.get(Res.path(id));
+            if (model == null || provided(Res.modelFile(id))) {
+                continue;
+            }
+            JsonObject copy = model.deepCopy();
+            remapModel(copy);
+            json.put(Res.modelFile(id), copy);
+            restored.add(Res.path(id));
+            queue.addAll(modelRefsOf(copy));
+        }
+        if (!restored.isEmpty()) {
+            overlay.info(restored.size() + " model(s) that 1.20.1 no longer ships were restored from 1.16.5: "
+                + String.join(", ", restored.subList(0, Math.min(12, restored.size()))) + (restored.size() > 12 ? ", ..." : ""));
+        }
+    }
+
+    private void upgradeSounds() {
+        LegacyVanilla legacy = LegacyVanilla.get();
+        JsonObject sounds = null;
+        if (provided(SOUNDS)) {
+            JsonElement el = readJson(SOUNDS);
+            if (el == null || !el.isJsonObject()) {
+                return;
+            }
+            sounds = el.getAsJsonObject();
+        }
+        boolean changed = false;
+        if (sounds != null) {
+            for (Map.Entry<String, String> r : legacy.renamedSounds.entrySet()) {
+                if (sounds.has(r.getKey()) && !sounds.has(r.getValue())) {
+                    sounds.add(r.getValue(), sounds.remove(r.getKey()));
+                    overlay.info(SOUNDS + ": sound event " + r.getKey() + " -> " + r.getValue());
+                    changed = true;
+                }
+            }
+        }
+        for (Map.Entry<String, JsonObject> e : legacy.legacySounds.entrySet()) {
+            String event = e.getKey();
+            if (sounds != null && sounds.has(event)) {
+                continue;
+            }
+            Set<String> current = legacy.currentSoundFiles.get(event);
+            JsonArray kept = new JsonArray();
+            boolean own = false;
+            JsonArray entries = e.getValue().has("sounds") ? e.getValue().getAsJsonArray("sounds") : new JsonArray();
+            for (JsonElement entry : entries) {
+                String name = soundName(entry);
+                if (name == null) {
+                    continue;
+                }
+                boolean inPack = pack.exists("assets/" + Res.namespace(name) + "/sounds/" + Res.path(name) + ".ogg");
+                boolean inGame = current.contains(Res.path(name));
+                if (inPack && !inGame) {
+                    own = true;
+                }
+                if (inPack || inGame) {
+                    kept.add(entry.deepCopy());
+                }
+            }
+            if (!own) {
+                continue;
+            }
+            if (sounds == null) {
+                sounds = new JsonObject();
+            }
+            JsonObject definition = e.getValue().deepCopy();
+            definition.addProperty("replace", true);
+            definition.add("sounds", kept);
+            sounds.add(event, definition);
+            overlay.info(SOUNDS + ": " + event + " plays the pack's 1.16.5 sound files again");
+            changed = true;
+        }
+        if (changed) {
+            json.put(SOUNDS, sounds);
+        }
+    }
+
+    private static String soundName(JsonElement entry) {
+        if (entry.isJsonPrimitive()) {
+            return Res.normalize(entry.getAsString());
+        }
+        if (entry.isJsonObject() && entry.getAsJsonObject().has("name")) {
+            JsonObject o = entry.getAsJsonObject();
+            if (o.has("type") && "event".equals(o.get("type").getAsString())) {
+                return null;
+            }
+            return Res.normalize(o.get("name").getAsString());
+        }
+        return null;
+    }
+
+    private void addImplicitGlyphPages() throws IOException {
+        List<JsonObject> pages = fonts.implicitPages();
+        if (pages.isEmpty()) {
+            return;
+        }
+        JsonObject font = null;
+        if (provided(DEFAULT_FONT)) {
+            JsonElement el = readJson(DEFAULT_FONT);
+            font = el != null && el.isJsonObject() ? el.getAsJsonObject() : null;
+        }
+        if (font == null) {
+            font = new JsonObject();
+        }
+        JsonArray providers = font.has("providers") && font.get("providers").isJsonArray() ? font.getAsJsonArray("providers") : new JsonArray();
+        pages.forEach(providers::add);
+        font.add("providers", providers);
+        json.put(DEFAULT_FONT, font);
+    }
+
+    private static Set<String> modelRefsOf(JsonElement model) {
+        Set<String> out = new LinkedHashSet<>();
+        if (model == null || !model.isJsonObject()) {
+            return out;
+        }
+        JsonObject o = model.getAsJsonObject();
+        if (o.has("parent") && o.get("parent").isJsonPrimitive()) {
+            out.add(Res.normalize(o.get("parent").getAsString()));
+        }
+        if (o.has("overrides") && o.get("overrides").isJsonArray()) {
+            for (JsonElement override : o.getAsJsonArray("overrides")) {
+                if (override.isJsonObject() && override.getAsJsonObject().has("model")) {
+                    out.add(Res.normalize(override.getAsJsonObject().get("model").getAsString()));
+                }
+            }
+        }
+        return out;
+    }
+
+    private static Set<String> blockstateRefs(JsonElement blockstate) {
+        Set<String> out = new LinkedHashSet<>();
+        if (blockstate == null || !blockstate.isJsonObject()) {
+            return out;
+        }
+        JsonObject o = blockstate.getAsJsonObject();
+        List<JsonElement> holders = new ArrayList<>();
+        if (o.has("variants") && o.get("variants").isJsonObject()) {
+            o.getAsJsonObject("variants").entrySet().forEach(e -> holders.add(e.getValue()));
+        }
+        if (o.has("multipart") && o.get("multipart").isJsonArray()) {
+            for (JsonElement c : o.getAsJsonArray("multipart")) {
+                if (c.isJsonObject() && c.getAsJsonObject().has("apply")) {
+                    holders.add(c.getAsJsonObject().get("apply"));
+                }
+            }
+        }
+        for (JsonElement h : holders) {
+            List<JsonElement> list = new ArrayList<>();
+            if (h.isJsonArray()) {
+                h.getAsJsonArray().forEach(list::add);
+            } else {
+                list.add(h);
+            }
+            for (JsonElement item : list) {
+                if (item.isJsonObject() && item.getAsJsonObject().has("model")) {
+                    out.add(Res.normalize(item.getAsJsonObject().get("model").getAsString()));
+                }
+            }
+        }
+        return out;
     }
 
     private static Set<String> texturesOf(JsonElement model) {

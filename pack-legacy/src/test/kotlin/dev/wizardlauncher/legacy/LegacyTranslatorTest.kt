@@ -197,6 +197,93 @@ class LegacyTranslatorTest {
         assertEquals(o.report(), back.report())
     }
 
+    private fun minimal(vararg extra: Pair<String, String>): MutableMap<String, ByteArray> =
+        (linkedMapOf("pack.mcmeta" to """{"pack":{"pack_format":6,"description":"Castle"}}""") + extra)
+            .mapValues { it.value.toByteArray() }.toMutableMap()
+
+    @Test fun `a door drawn with 1_16_5 models keeps its own models`() {
+        val o = overlay(minimal(
+            "assets/minecraft/models/block/iron_door_bottom.json" to """{"parent":"block/door_bottom","textures":{"bottom":"block/iron_door_bottom","top":"block/iron_door_top"}}""",
+        ))
+        val variants = o.json("assets/minecraft/blockstates/iron_door.json").getAsJsonObject("variants")
+        assertTrue(variants.entrySet().any { it.value.asJsonObject.get("model").asString == "minecraft:block/iron_door_bottom" })
+        assertNotNull(o.file("assets/minecraft/models/block/door_bottom.json"))
+        assertNotNull(o.file("assets/minecraft/models/block/iron_door_top_hinge.json"))
+        assertNotNull(o.file("assets/minecraft/models/block/door_top_rh.json"))
+        assertNull(o.file("assets/minecraft/models/block/iron_door_bottom.json"))
+        assertNull(o.file("assets/minecraft/blockstates/oak_door.json"))
+    }
+
+    @Test fun `a door with only new textures is left to the game`() {
+        val files = minimal()
+        files["assets/minecraft/textures/block/iron_door_bottom.png"] = "png".toByteArray()
+        val o = overlay(files)
+        assertNull(o.file("assets/minecraft/blockstates/iron_door.json"))
+        assertNull(o.file("assets/minecraft/models/block/door_bottom.json"))
+    }
+
+    @Test fun `vines drawn with the old face models use the old block states`() {
+        val o = overlay(minimal(
+            "assets/minecraft/models/block/vine_1.json" to """{"ambientocclusion":false,"textures":{"particle":"block/vine","vine":"block/vine"},"elements":[]}""",
+        ))
+        val variants = o.json("assets/minecraft/blockstates/vine.json").getAsJsonObject("variants")
+        assertTrue(variants.size() > 20)
+        assertNotNull(o.file("assets/minecraft/models/block/vine_2_opposite.json"))
+        assertNotNull(o.file("assets/minecraft/models/block/vine_u.json"))
+        assertNull(o.file("assets/minecraft/models/block/vine_1.json"))
+    }
+
+    @Test fun `models built on parents 1_20_1 removed get those parents back`() {
+        val o = overlay(minimal(
+            "assets/minecraft/models/block/soul_fire_floor0.json" to """{"parent":"block/fire_floor","textures":{"fire":"block/soul_fire_0"}}""",
+            "assets/wizard/models/block/lamp.json" to """{"parent":"minecraft:block/hanging_lantern","textures":{"lantern":"wizard:block/lamp"}}""",
+            "assets/wizard/blockstates/torch.json" to """{"variants":{"":{"model":"minecraft:block/torch_wall"}}}""",
+        ))
+        assertTrue(o.json("assets/minecraft/models/block/fire_floor.json").has("elements"))
+        assertTrue(o.json("assets/minecraft/models/block/hanging_lantern.json").has("elements"))
+        assertTrue(o.json("assets/minecraft/models/block/torch_wall.json").has("elements"))
+        assertNull(o.file("assets/minecraft/blockstates/fire.json"))
+    }
+
+    @Test fun `sound events renamed after 1_16_5 keep the pack's sounds`() {
+        val files = minimal("assets/minecraft/sounds.json" to """{"item.sweet_berries.pick_from_bush":{"replace":true,"sounds":["wizard:berry"]}}""")
+        files["assets/minecraft/sounds/block/wooden_door/open.ogg"] = "ogg".toByteArray()
+        val sounds = overlay(files).json("assets/minecraft/sounds.json")
+        assertFalse(sounds.has("item.sweet_berries.pick_from_bush"))
+        assertEquals("wizard:berry", sounds.getAsJsonObject("block.sweet_berry_bush.pick_berries").getAsJsonArray("sounds")[0].asString)
+        val locked = sounds.getAsJsonObject("block.chest.locked")
+        assertTrue(locked.get("replace").asBoolean)
+        assertEquals(listOf("block/wooden_door/open"), locked.getAsJsonArray("sounds").map { if (it.isJsonPrimitive) it.asString else it.asJsonObject.get("name").asString })
+        assertFalse(sounds.has("block.wooden_door.close"))
+    }
+
+    @Test fun `sounds are untouched when the pack only replaces files the game still uses`() {
+        val files = minimal()
+        files["assets/minecraft/sounds/block/wooden_door/close1.ogg"] = "ogg".toByteArray()
+        assertNull(overlay(files).file("assets/minecraft/sounds.json"))
+    }
+
+    @Test fun `private use glyphs from unicode pages still show without a font file`() {
+        val files = minimal()
+        files["assets/minecraft/textures/font/unicode_page_e0.png"] = fontPage()
+        files["assets/minecraft/textures/font/unicode_page_00.png"] = fontPage()
+        val o = overlay(files)
+        val providers = o.json("assets/minecraft/font/default.json").getAsJsonArray("providers").map { it.asJsonObject }
+        assertEquals(1, providers.count { it.get("type").asString == "bitmap" })
+        assertEquals('\uE000', providers.first().getAsJsonArray("chars")[0].asString[0])
+        assertNull(o.file("assets/minecraft/textures/font/wizard_legacy_unicode_page_00.png"))
+        val page = ImageIO.read(ByteArrayInputStream(o.file("assets/minecraft/textures/font/wizard_legacy_unicode_page_e0.png")))
+        assertEquals(0xFFFF0000.toInt(), page.getRGB(0, 0))
+        assertEquals(0xFF00FF00.toInt(), page.getRGB(13, 0))
+    }
+
+    @Test fun `player skins moved in 1_19_3 are served from their new folders`() {
+        val files = minimal()
+        files["assets/minecraft/textures/entity/steve.png"] = "png".toByteArray()
+        val o = overlay(files)
+        assertEquals("assets/minecraft/textures/entity/steve.png", o.aliasOf("assets/minecraft/textures/entity/player/wide/steve.png"))
+    }
+
     @Test fun `unsafe paths and bad rules are refused`() {
         assertFalse(FilePackView.safePath("../evil.txt"))
         assertFalse(FilePackView.safePath("assets/../../x"))
