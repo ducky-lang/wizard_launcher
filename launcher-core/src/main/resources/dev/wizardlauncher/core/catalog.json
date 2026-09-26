@@ -3,7 +3,7 @@
   "minecraft": {
     "client_version": "1.20.1",
     "server_version": "1.16.5",
-    "fabric_loader_fallback": "0.15.11",
+    "fabric_loader_fallback": "0.15.10",
     "required_java_major": 17
   },
   "server": {
@@ -51,12 +51,12 @@
     "backoff_seconds": 2
   },
   "modpack": {
-    "id": "fabulously-optimized",
-    "name": "Fabulously Optimized",
-    "version": "5.4.1",
-    "url": "https://cdn.modrinth.com/data/1KVo5zza/versions/2ZbcYfCj/Fabulously.Optimized-5.4.1.mrpack",
-    "sha512": "af4b2043f00bcceefdbe1c0ec3ea3cc4d385052d963a9778164b702c3a5dad6e60aa30a1d293ab03b5b780fe1fce75dc846ee3d40a7d1c01bddf74dd76174e62",
-    "approx_mb": 120,
+    "id": "fps",
+    "name": "FPS Modpack",
+    "version": "1.8",
+    "url": "https://cdn.modrinth.com/data/nJ2Rn3SV/versions/fhqny3KP/FPS%20Modpack-1.8.mrpack",
+    "sha512": "5ceed6ad52dabc161f7cce25ebeaa542a948ba9dcf0a706c19b11275077458ca30755a2cfb37c4f1ca016f62fcdb1605a3a053499263db1bccfbcad01fd966d4",
+    "approx_mb": 25,
     "extra_mods": [
       {
         "name": "CustomSkinLoader",
@@ -70,18 +70,18 @@
     {
       "id": "1.20.1",
       "name": "Castle · 1.20.1",
-      "description": "The classic client the castle was tuned on.",
+      "description": "The classic client the castle was tuned on, with the FPS Modpack.",
       "minecraft": "1.20.1",
-      "fabric_loader_fallback": "0.15.11",
+      "fabric_loader_fallback": "0.15.10",
       "required_java_major": 17,
       "pack_format": 15,
       "modpack": {
-        "id": "fabulously-optimized",
-        "name": "Fabulously Optimized",
-        "version": "5.4.1",
-        "url": "https://cdn.modrinth.com/data/1KVo5zza/versions/2ZbcYfCj/Fabulously.Optimized-5.4.1.mrpack",
-        "sha512": "af4b2043f00bcceefdbe1c0ec3ea3cc4d385052d963a9778164b702c3a5dad6e60aa30a1d293ab03b5b780fe1fce75dc846ee3d40a7d1c01bddf74dd76174e62",
-        "approx_mb": 120,
+        "id": "fps",
+        "name": "FPS Modpack",
+        "version": "1.8",
+        "url": "https://cdn.modrinth.com/data/nJ2Rn3SV/versions/fhqny3KP/FPS%20Modpack-1.8.mrpack",
+        "sha512": "5ceed6ad52dabc161f7cce25ebeaa542a948ba9dcf0a706c19b11275077458ca30755a2cfb37c4f1ca016f62fcdb1605a3a053499263db1bccfbcad01fd966d4",
+        "approx_mb": 25,
         "extra_mods": [
           {
             "name": "CustomSkinLoader",
@@ -95,18 +95,18 @@
     {
       "id": "1.21.1",
       "name": "Castle · 1.21.1",
-      "description": "A newer client with Sodium 0.6 and Java 21.",
+      "description": "A newer client with the FPS Modpack and Java 21.",
       "minecraft": "1.21.1",
-      "fabric_loader_fallback": "0.19.3",
+      "fabric_loader_fallback": "0.16.7",
       "required_java_major": 21,
       "pack_format": 34,
       "modpack": {
-        "id": "fabulously-optimized",
-        "name": "Fabulously Optimized",
-        "version": "6.5.0",
-        "url": "https://cdn.modrinth.com/data/1KVo5zza/versions/N276l2ON/Fabulously.Optimized-v6.5.0.mrpack",
-        "sha512": "56d67f427207f561e21eaf53e98e4af1429327f3fa1215361e9bfad73e19fa905687c7692de2a1174d66e3bff4ffd7c7d3fbd8fe88de5d3fb50ba79f673e0f00",
-        "approx_mb": 140,
+        "id": "fps",
+        "name": "FPS Modpack",
+        "version": "2.6",
+        "url": "https://cdn.modrinth.com/data/nJ2Rn3SV/versions/RnOABzNk/FPS%20Modpack-2.6.mrpack",
+        "sha512": "cea9863f5b5c1ecc618509427fe9e83462a070971eb7b1b0acb4368b7c4a4aaa83b3c95e1b388f0957e27cb57ab78856218d93b00c1f8bad2e987311503604de",
+        "approx_mb": 25,
         "extra_mods": [
           {
             "name": "CustomSkinLoader",

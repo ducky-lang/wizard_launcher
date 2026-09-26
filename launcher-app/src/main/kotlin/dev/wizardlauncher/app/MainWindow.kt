@@ -229,7 +229,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
                     "Wizard Launcher ${BuildInfo.version}\n\n" +
                         "Map: Witchcraft and Wizardry by The Floo Network.\n" +
                         "World: Minecraft 1.16.5, bridged by ViaProxy (same JVM).\n" +
-                        "Client: Minecraft 1.20.1 or 1.21.1 + Fabulously Optimized.\n\n" +
+                        "Client: Minecraft 1.20.1 or 1.21.1 + FPS Modpack.\n\n" +
                         "Data folder:\n${launcher.paths.root}", "About", JOptionPane.INFORMATION_MESSAGE)
             }
         })

@@ -86,7 +86,7 @@ A fast, polished UI rendered by an embedded Chromium engine (JCEF). Motion is li
 
 | Area | What you get |
 |---|---|
-| **Installations** | *Castle · 1.20.1* (Fabulously Optimized 5) and *Castle · 1.21.1* (Fabulously Optimized 6, Sodium 0.6, Java 21) live in separate folders and are picked beside the Play button. Game libraries and assets are shared, so the second version costs only what differs. Import a Fabric modpack from Modrinth (`.mrpack`) and it becomes one more installation that joins the same castle; packs for Forge, NeoForge, Quilt or CurseForge are refused with a clear message, and every modpack file must come from Modrinth, GitHub or GitLab with a SHA-512. A new installation starts with the controls and video settings of the one you played last. |
+| **Installations** | *Castle · 1.20.1* and *Castle · 1.21.1* (Java 21), both running the lightweight [FPS Modpack](https://modrinth.com/modpack/fps) (Sodium, Iris, ImmediatelyFast and a few engine optimisations), live in separate folders and are picked beside the Play button. Game libraries and assets are shared, so the second version costs only what differs. Import a Fabric modpack from Modrinth (`.mrpack`) and it becomes one more installation that joins the same castle; packs for Forge, NeoForge, Quilt or CurseForge are refused with a clear message, and every modpack file must come from Modrinth, GitHub or GitLab with a SHA-512. A new installation starts with the controls and video settings of the one you played last. |
 | **Play** | One button installs, repairs and launches. It shows staged progress (castle → game files → mods → portal → launch) with live speed. The world boots while Minecraft loads, and Minecraft waits on an *Opening the castle gates…* screen, then joins by itself as soon as the world is ready. The world saves and stops by itself when Minecraft exits, even if the launcher was closed. |
 | **Accounts** | Microsoft sign-in with a device code, so your password is only typed on Microsoft's site. Offline players are also supported, and you can switch between several accounts with one click. Signed-in players keep playing when offline, using their saved profile. |
 | **Library** | Mods: enable, disable, add and remove, with modpack mods protected. Resource packs: enable, disable, add and remove, with 1.16.5 packs badged as *read natively* and an optional export to a zip for the selected version. Shader packs: add and remove. |
@@ -107,7 +107,7 @@ flowchart LR
     subgraph Launcher["Wizard Launcher (Java 17, bundled)"]
         UI["Chromium UI<br/>(JCEF, offline origin)"] -- "JSON bridge" --> Core["launcher-core<br/>install · accounts · processes"]
     end
-    Core -- "stdin (no token on the command line)" --> Boot["client-boot"] --> MC["Minecraft 1.20.1 or 1.21.1<br/>Fabric + Fabulously Optimized<br/>+ Wizard Legacy Packs"]
+    Core -- "stdin (no token on the command line)" --> Boot["client-boot"] --> MC["Minecraft 1.20.1 or 1.21.1<br/>Fabric + FPS Modpack<br/>+ Wizard Legacy Packs"]
     Core -- "stop / watch PID" --> Host
     subgraph Host["One JVM: server-host"]
         Via["ViaProxy<br/>1.20.1 / 1.21.1 ⇄ 1.16.5"] --> Server["Vanilla 1.16.5 server<br/>(isolated class loader)"]
@@ -290,7 +290,7 @@ Microsoft sign-in needs a public Azure application id, passed as the `MC_LAUNCHE
 - **Launcher:** Foxy (.phungminh).
 - **Built on:**
   - [Fabric](https://fabricmc.net/)
-  - [Fabulously Optimized](https://modrinth.com/modpack/fabulously-optimized)
+  - [FPS Modpack](https://modrinth.com/modpack/fps)
   - [XZ for Java](https://tukaani.org/xz/java.html)
   - [ViaProxy](https://github.com/ViaVersion/ViaProxy)
   - [JCEF](https://github.com/chromiumembedded/java-cef) via [jcefmaven](https://github.com/jcefmaven/jcefmaven)

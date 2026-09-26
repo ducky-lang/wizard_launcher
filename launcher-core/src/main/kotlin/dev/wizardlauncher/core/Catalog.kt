@@ -71,7 +71,7 @@ class Catalog private constructor(root: JsonObject) {
     }
 
     private fun modpackOf(m: JsonObject) = Modpack(
-        m.str("id", "fabulously-optimized"), m.str("name", "Fabulously Optimized"), m.str("version", ""),
+        m.str("id", "fps"), m.str("name", "FPS Modpack"), m.str("version", ""),
         m.str("url", ""), m.str("sha512", ""), m.int("approx_mb", 120),
         (m.getAsJsonArray("extra_mods") ?: com.google.gson.JsonArray()).map { it.asJsonObject }.map {
             ExtraMod(it.str("name", ""), it.str("path", ""), it.str("url", ""), it.str("sha512", ""))

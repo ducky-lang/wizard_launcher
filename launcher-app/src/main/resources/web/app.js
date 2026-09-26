@@ -210,7 +210,7 @@
             <div class="meta">
               <span>${ICONS.cube}Minecraft ${esc(info.clientVersion || "1.20.1")}</span>
               <span>${ICONS.feather}Fabric</span>
-              <span>${ICONS.zap}${esc(info.modpack || "Fabulously Optimized")}</span>
+              <span>${ICONS.zap}${esc(info.modpack || "FPS Modpack")}</span>
               <span>${ICONS.castle}${t("card.world")} ${esc(info.serverVersion || "1.16.5")}</span>
             </div>
             <div class="play-row">

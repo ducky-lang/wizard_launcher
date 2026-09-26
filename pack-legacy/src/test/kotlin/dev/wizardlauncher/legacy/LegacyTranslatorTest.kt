@@ -321,7 +321,8 @@ class LegacyTranslatorTest {
         assertEquals("nine_slice", meta.getAsJsonObject("gui").getAsJsonObject("scaling").get("type").asString)
         val hotbar = ImageIO.read(ByteArrayInputStream(assertNotNull(o.file("assets/minecraft/textures/gui/sprites/hud/hotbar.png"))))
         assertEquals(364, hotbar.width)
-        assertNull(o.file("assets/minecraft/textures/gui/sprites/widget/button_disabled.png"))
+        val hidden = ImageIO.read(ByteArrayInputStream(assertNotNull(o.file("assets/minecraft/textures/gui/sprites/widget/button_disabled.png"))))
+        assertEquals(0, hidden.getRGB(10, 10) ushr 24)
         assertEquals(34, o.json("pack.mcmeta").getAsJsonObject("pack").get("pack_format").asInt)
     }
 

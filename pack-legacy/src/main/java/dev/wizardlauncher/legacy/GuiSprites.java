@@ -91,16 +91,10 @@ final class GuiSprites {
             return null;
         }
         BufferedImage out = new BufferedImage(cw, ch, BufferedImage.TYPE_INT_ARGB);
-        boolean visible = false;
         for (int y = 0; y < ch; y++) {
             for (int x = 0; x < cw; x++) {
-                int argb = sheet.getRGB(x0 + x, y0 + y);
-                visible |= (argb >>> 24) != 0;
-                out.setRGB(x, y, argb);
+                out.setRGB(x, y, sheet.getRGB(x0 + x, y0 + y));
             }
-        }
-        if (!visible) {
-            return null;
         }
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
