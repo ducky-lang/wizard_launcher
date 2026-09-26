@@ -1,7 +1,6 @@
 package dev.wizardlauncher.legacypacks;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.world.entity.AreaEffectCloud;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ambient.AmbientCreature;
@@ -32,8 +31,7 @@ public final class LegacyRiding {
         if (!plain) {
             return false;
         }
-        ClientPacketListener connection = Minecraft.getInstance().getConnection();
-        return connection != null && LegacyEffects.fromLocalWorld(connection.getConnection().getRemoteAddress());
+        return LegacyEffects.fromLegacyWorld(Minecraft.getInstance().getConnection());
     }
 
     public static double riderY(Entity vehicle, Entity rider) {

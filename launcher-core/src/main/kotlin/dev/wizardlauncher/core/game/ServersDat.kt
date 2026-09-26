@@ -93,6 +93,40 @@ object GameOptions {
         Files.write(optionsFile, lines)
     }
 
+    private val QUIET = linkedMapOf(
+        "onboardAccessibility" to "false",
+        "skipMultiplayerWarning" to "true",
+        "joinedFirstServer" to "true",
+        "tutorialStep" to "none",
+    )
+
+    private val FRESH = linkedMapOf(
+        "mipmapLevels" to "3",
+        "renderDistance" to "10",
+        "simulationDistance" to "8",
+        "entityShadows" to "false",
+        "maxFps" to "144",
+        "narrator" to "0",
+    )
+
+    fun prepare(optionsFile: Path) {
+        val fresh = !Files.isRegularFile(optionsFile)
+        val lines = if (fresh) mutableListOf() else Files.readAllLines(optionsFile).toMutableList()
+        val keys = lines.map { it.substringBefore(':') }.toMutableSet()
+        var changed = false
+        val wanted = if (fresh) QUIET + FRESH else QUIET
+        for ((key, value) in wanted) {
+            if (key in keys) continue
+            lines += "$key:$value"
+            keys += key
+            changed = true
+        }
+        if (changed) {
+            Files.createDirectories(optionsFile.parent)
+            Files.write(optionsFile, lines)
+        }
+    }
+
     fun setFullscreen(optionsFile: Path, fullscreen: Boolean) {
         val lines = if (Files.isRegularFile(optionsFile)) Files.readAllLines(optionsFile).toMutableList() else mutableListOf()
         val idx = lines.indexOfFirst { it.startsWith("fullscreen:") }

@@ -144,6 +144,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
 
             val address = "127.0.0.1:${server.ports.proxy}"
             inheritOptions(instance, s.gameDir)
+            GameOptions.prepare(s.gameDir.resolve("options.txt"))
             ServersDat.upsert(s.gameDir.resolve("servers.dat"), catalog.server.entryName, address)
             GameOptions.enableResourcePack(s.gameDir.resolve("options.txt"), packName,
                 compatible = legacyReader, stale = s.content.staleNames().filter { it != packName })

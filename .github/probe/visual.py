@@ -82,7 +82,18 @@ def command(text):
 
 command("/effect give @s minecraft:levitation 1000 255 true")
 time.sleep(2)
-command("/execute at @s run summon armor_stand ^ ^ ^3 {NoGravity:1b,ShowArms:1b,Rotation:[180f,0f],ArmorItems:[{},{},{id:\"minecraft:diamond_chestplate\",Count:1b},{id:\"minecraft:gold_block\",Count:1b}],Passengers:[{id:\"minecraft:armor_stand\",ShowArms:1b,ArmorItems:[{},{},{id:\"minecraft:iron_chestplate\",Count:1b},{id:\"minecraft:diamond_block\",Count:1b}],Passengers:[{id:\"minecraft:armor_stand\",Small:1b,ArmorItems:[{},{},{},{id:\"minecraft:emerald_block\",Count:1b}]}]}]}")
+pack = os.path.join(DATA, "resources/servers/1.16.5/world/datapacks/wiztest")
+os.makedirs(os.path.join(pack, "data/wiztest/functions"), exist_ok=True)
+open(os.path.join(pack, "pack.mcmeta"), "w").write('{"pack":{"pack_format":6,"description":"test"}}')
+open(os.path.join(pack, "data/wiztest/functions/stack.mcfunction"), "w").write(
+    'execute at @s run summon armor_stand ^ ^ ^3 {NoGravity:1b,Tags:["wiztest"],ArmorItems:[{},{},{id:"minecraft:diamond_chestplate",Count:1b},{id:"minecraft:gold_block",Count:1b}],'
+    'Passengers:[{id:"minecraft:armor_stand",Tags:["wiztest"],ArmorItems:[{},{},{id:"minecraft:iron_chestplate",Count:1b},{id:"minecraft:diamond_block",Count:1b}],'
+    'Passengers:[{id:"minecraft:armor_stand",Small:1b,Tags:["wiztest"],ArmorItems:[{},{},{},{id:"minecraft:emerald_block",Count:1b}]}]}]}\n')
+command("/reload")
+time.sleep(8)
+command("/datapack enable \"file/wiztest\"")
+time.sleep(4)
+command("/function wiztest:stack")
 time.sleep(4)
 key("F1")
 time.sleep(1)

@@ -20,7 +20,7 @@ public abstract class EffectPacketMixin {
         if (legacy >= 0 && legacy <= 255) {
             return;
         }
-        if (!LegacyEffects.fromLocalWorld(((ClientPacketListener) (Object) this).getConnection().getRemoteAddress())) {
+        if (!LegacyEffects.fromLegacyWorld((ClientPacketListener) (Object) this)) {
             return;
         }
         Entity entity = Minecraft.getInstance().level == null ? null : Minecraft.getInstance().level.getEntity(packet.getEntityId());

@@ -2,6 +2,7 @@ package dev.wizardlauncher.legacypacks;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class LegacyEffects {
@@ -10,7 +11,15 @@ public final class LegacyEffects {
     private LegacyEffects() {
     }
 
-    public static boolean fromLocalWorld(SocketAddress server) {
+    public static boolean fromLegacyWorld(ClientPacketListener listener) {
+        if (listener == null) {
+            return false;
+        }
+        String brand = listener.serverBrand();
+        if (brand != null && brand.contains("ViaProxy") && brand.contains("(1.16")) {
+            return true;
+        }
+        SocketAddress server = listener.getConnection().getRemoteAddress();
         return server instanceof InetSocketAddress inet && inet.getAddress() != null && inet.getAddress().isLoopbackAddress();
     }
 

@@ -127,6 +127,7 @@
     const order = PAGES.map(([id]) => id);
     const changed = prev !== page;
     state.page = page;
+    $("#app").dataset.page = page;
     $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
     $$(".page").forEach((p) => p.classList.toggle("active", p.id === "page-" + page));
     $("#pageTitle").textContent = t("nav." + page);
@@ -176,17 +177,18 @@
   }
 
   function bindHeroArt() {
-    const art = $("#heroArt");
-    if (!art) return;
-    art.addEventListener("load", () => art.classList.add("loaded"), { once: true });
-    art.addEventListener("error", () => art.remove(), { once: true });
+    const art = $("#sceneArt");
+    if (!art || art.dataset.bound) return;
+    art.dataset.bound = "1";
+    const ok = () => $("#scenery").classList.add("loaded");
+    if (art.complete && art.naturalWidth) ok();
+    art.addEventListener("load", ok);
+    art.addEventListener("error", () => $("#scenery").classList.remove("loaded"));
   }
 
   function retryHeroArt() {
-    const hero = $(".hero");
-    if (!hero || $("#heroArt", hero)) return;
-    hero.insertAdjacentHTML("afterbegin", `<img class="hero-art" id="heroArt" src="/media/hero.jpg?${Date.now()}" alt="">`);
-    bindHeroArt();
+    if ($("#scenery").classList.contains("loaded")) return;
+    $("#sceneArt").src = "/media/hero.jpg?" + Date.now();
   }
 
   function playLabel() {
@@ -201,8 +203,6 @@
       const info = state.info || {};
       el.innerHTML = `
         <section class="hero">
-          <img class="hero-art" id="heroArt" src="/media/hero.jpg" alt="">
-          <div class="hero-shade"></div>
           <div class="hero-copy">
             <div class="eyebrow">${t("hero.eyebrow")}</div>
             <h2>${t("hero.title")}</h2>

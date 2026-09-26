@@ -68,7 +68,7 @@ class ContentInstaller(
         if (!online && cached == null) throw LauncherException(
             "${resource.name} has not been downloaded yet. Turn offline mode off and connect once, or import an offline bundle.")
         val sha256 = try {
-            downloader.download(resource.url, zip, Checksum.sha256(expected), maxBytes = 8L shl 30) { done, total ->
+            downloader.download(resource.url, zip, Checksum.sha256(expected), maxBytes = 8L shl 30, resume = expected != null) { done, total ->
                 progress.update(if (total > 0) done.toDouble() / total else null,
                     "${resource.name}  ·  ${formatBytes(done)}${if (total > 0) " of ${formatBytes(total)}" else ""}")
             }

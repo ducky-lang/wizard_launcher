@@ -168,6 +168,21 @@ class CoreTest {
         assertFalse(Files.exists(fresh.root.resolve("resources/client")))
     }
 
+    @Test fun `game options skip first run popups and keep the player's choices`() {
+        val options = tmp.resolve("game/options.txt")
+        GameOptions.prepare(options)
+        val fresh = Files.readAllLines(options)
+        assertTrue("onboardAccessibility:false" in fresh)
+        assertTrue("mipmapLevels:3" in fresh)
+        Files.write(options, listOf("renderDistance:24", "onboardAccessibility:true"))
+        GameOptions.prepare(options)
+        val kept = Files.readAllLines(options)
+        assertTrue("renderDistance:24" in kept)
+        assertTrue("onboardAccessibility:true" in kept)
+        assertTrue("skipMultiplayerWarning:true" in kept)
+        assertFalse(kept.any { it.startsWith("mipmapLevels") })
+    }
+
     @Test fun `install fingerprints change with their inputs`() {
         assertEquals(InstallState.fingerprint("a", 1), InstallState.fingerprint("a", 1))
         assertTrue(InstallState.fingerprint("a", 1) != InstallState.fingerprint("a", 2))
