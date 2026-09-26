@@ -10,6 +10,7 @@ import java.time.Instant
 import javax.imageio.IIOImage
 import javax.imageio.ImageIO
 import javax.imageio.ImageWriteParam
+import java.util.zip.ZipFile
 
 data class Screenshot(val file: String, val takenAt: Long, val sizeBytes: Long)
 
@@ -55,14 +56,20 @@ class ScreenshotLibrary(private val gameDir: Path, private val cacheDir: Path) {
     }
 }
 
-class HeroArt(private val gameDir: Path, private val cacheDir: Path, private val screenshots: ScreenshotLibrary) {
+class HeroArt(
+    private val gameDir: Path,
+    private val cacheDir: Path,
+    private val screenshots: ScreenshotLibrary,
+    private val extraPacks: List<Path> = emptyList(),
+) {
+    private class Source(val key: String, val stamp: Long, val read: () -> BufferedImage?)
+
     fun image(): ByteArray? {
-        val source = packArt() ?: screenshots.list().firstOrNull()?.let { screenshots.resolve(it.file) } ?: return null
-        val stamp = Files.getLastModifiedTime(source).toMillis()
-        val cached = cacheDir.resolve("hero").resolve("hero-${source.fileName.toString().hashCode().toUInt()}-$stamp.jpg")
+        val source = packArt() ?: screenshots.list().firstOrNull()?.let { screenshots.resolve(it.file) }?.let(::fileSource) ?: return null
+        val cached = cacheDir.resolve("hero").resolve("hero-${source.key.hashCode().toUInt()}-${source.stamp}.jpg")
         if (Files.isRegularFile(cached)) return Files.readAllBytes(cached)
         return runCatching {
-            val image = ImageIO.read(source.toFile()) ?: return null
+            val image = source.read() ?: return null
             val top = photoTop(image)
             val height = image.height - top
             val width = minOf(1920, image.width)
@@ -74,7 +81,7 @@ class HeroArt(private val gameDir: Path, private val cacheDir: Path, private val
                 drawImage(image, 0, 0, width, outHeight, 0, top, image.width, image.height, null)
                 dispose()
             }
-            val bytes = jpeg(out, 0.92f)
+            val bytes = jpeg(out, 0.9f)
             Files.createDirectories(cached.parent)
             Files.list(cached.parent).use { old -> old.filter { it != cached }.forEach { runCatching { Files.deleteIfExists(it) } } }
             Files.write(cached, bytes)
@@ -97,13 +104,29 @@ class HeroArt(private val gameDir: Path, private val cacheDir: Path, private val
         return out.toByteArray()
     }
 
-    private fun packArt(): Path? {
+    private fun fileSource(path: Path) = Source(path.toString(), Files.getLastModifiedTime(path).toMillis()) { ImageIO.read(path.toFile()) }
+
+    private fun packArt(): Source? {
         val packs = gameDir.resolve("resourcepacks")
-        if (!Files.isDirectory(packs)) return null
-        val candidates = Files.list(packs).use { s -> s.filter(Files::isDirectory).toList() }
-            .sortedBy { if (it.fileName.toString() == "Resource Pack") 0 else 1 }
-        return candidates.map { it.resolve(ART) }.firstOrNull(Files::isRegularFile)
+        val installed = if (Files.isDirectory(packs)) Files.list(packs).use { it.toList() } else emptyList()
+        return (installed + extraPacks)
+            .sortedBy { if (it.fileName.toString().startsWith("Resource Pack")) 0 else 1 }
+            .firstNotNullOfOrNull(::artIn)
     }
+
+    private fun artIn(pack: Path): Source? = runCatching {
+        when {
+            Files.isDirectory(pack) -> pack.resolve(ART).takeIf(Files::isRegularFile)?.let(::fileSource)
+            Files.isRegularFile(pack) && pack.fileName.toString().lowercase().endsWith(".zip") -> ZipFile(pack.toFile()).use { zip ->
+                zip.getEntry(ART)?.let {
+                    Source("$pack!$ART", Files.getLastModifiedTime(pack).toMillis()) {
+                        ZipFile(pack.toFile()).use { z -> z.getInputStream(z.getEntry(ART)).use(ImageIO::read) }
+                    }
+                }
+            }
+            else -> null
+        }
+    }.getOrNull()
 
     private fun photoTop(image: BufferedImage): Int {
         var y = image.height - 1

@@ -58,7 +58,7 @@ class Bridge(private val launcher: Launcher, private val host: Host) {
     private val shaders get() = ShaderLibrary(paths.gameDir)
     private val shots get() = ScreenshotLibrary(paths.gameDir, paths.root.resolve("cache"))
     private val worlds get() = Worlds(paths.worldDir, paths.backups)
-    private val hero get() = HeroArt(paths.gameDir, paths.root.resolve("cache"), shots)
+    private val hero get() = HeroArt(paths.gameDir, paths.root.resolve("cache"), shots, listOf(paths.contentCache.resolve("${Catalog.current.resource("resource_pack").name}.zip")))
     private val avatars = Avatars(launcher)
     @Volatile private var gameState = "idle"
     @Volatile private var update: UpdateInfo? = null

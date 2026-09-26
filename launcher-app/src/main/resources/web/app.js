@@ -920,6 +920,8 @@
     document.addEventListener("contextmenu", (e) => { if (!e.target.closest("input, textarea, .console, pre")) e.preventDefault(); });
   }
 
+  const bootStart = performance.now();
+
   async function boot() {
     try {
       state.settings = await WL.call("settings.get");
@@ -939,10 +941,12 @@
     await refreshAccounts();
     renderChips();
     go("home");
+    const shown = performance.now() - bootStart;
+    if (FX.enabled() && shown < 1700) await new Promise((r) => setTimeout(r, 1700 - shown));
     requestAnimationFrame(() => {
       $("#app").classList.add("ready");
       $("#boot").classList.add("gone");
-      setTimeout(() => $("#boot")?.remove(), 700);
+      setTimeout(() => $("#boot")?.remove(), 800);
       moveIndicator();
     });
     if (!state.settings.onboarding_done) setTimeout(onboarding, 650);
