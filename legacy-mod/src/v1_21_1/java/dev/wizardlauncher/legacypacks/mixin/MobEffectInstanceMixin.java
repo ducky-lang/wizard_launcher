@@ -15,11 +15,16 @@ public abstract class MobEffectInstanceMixin {
     @Shadow
     private int amplifier;
 
+    @Shadow
+    public abstract String getDescriptionId();
+
     @Inject(method = "<init>*", at = @At("RETURN"))
     private void wizard$legacyAmplifier(CallbackInfo ci) {
         Integer raw = LegacyEffects.take();
         if (raw != null) {
-            this.amplifier = LegacyEffects.signed(raw);
+            int legacy = LegacyEffects.signed(raw);
+            LegacyEffects.restored(getDescriptionId(), legacy, this.amplifier);
+            this.amplifier = legacy;
         }
     }
 }

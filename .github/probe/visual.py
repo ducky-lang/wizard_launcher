@@ -19,9 +19,10 @@ def text():
     except OSError:
         return ""
 
-def shot(label):
+def shot(label, crop=None):
     png = subprocess.run(["import", "-window", "root", "png:-"], env=env, capture_output=True).stdout
-    jpg = subprocess.run(["convert", "png:-", "-resize", "1024x", "-quality", "72", "jpg:-"], input=png, capture_output=True).stdout
+    args = ["-crop", crop] if crop else ["-resize", "1024x"]
+    jpg = subprocess.run(["convert", "png:-", *args, "-quality", "72", "jpg:-"], input=png, capture_output=True).stdout
     print(f"@@SHOT {label} {base64.b64encode(jpg).decode()}", flush=True)
 
 def xdo(*args):
@@ -68,6 +69,17 @@ for step in range(16):
     key("f")
 time.sleep(5)
 shot("end")
+key("F3")
+time.sleep(1.5)
+shot("hover-before", "700x420+0+0")
+key("t")
+time.sleep(1)
+xdo("type", "--delay", "40", "/effect give @s minecraft:levitation 30 255 true")
+key("Return")
+for t in (1, 3, 6, 10):
+    time.sleep(t - (0 if t == 1 else {3: 1, 6: 3, 10: 6}[t]))
+    shot(f"hover-{t}s", "700x420+0+0")
+shot("hover-full")
 t = text()
 chat = [l for l in t.splitlines() if "[CHAT]" in l]
 print(f"@@CHAT {len(chat)} lines")
