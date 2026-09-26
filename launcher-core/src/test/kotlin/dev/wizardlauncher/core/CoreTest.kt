@@ -11,6 +11,8 @@ import dev.wizardlauncher.core.install.ModpackInstaller
 import dev.wizardlauncher.core.install.OfflineBundle
 import dev.wizardlauncher.core.install.Rules
 import dev.wizardlauncher.core.install.SafeZip
+import dev.wizardlauncher.core.library.HeroArt
+import dev.wizardlauncher.core.library.ScreenshotLibrary
 import dev.wizardlauncher.core.net.SecureDownloader
 import dev.wizardlauncher.core.security.Redactor
 import dev.wizardlauncher.core.security.SecretStore
@@ -213,5 +215,20 @@ class CoreTest {
         ModConfigs.enforce(game)
         assertEquals("useBlockStateCulling = false", Files.readAllLines(game.resolve("config/moreculling.toml")).first())
         assertFalse(ModConfigs.patchToml(game.resolve("config/moreculling.toml"), mapOf("useBlockStateCulling" to "false")))
+    }
+
+    @Test
+    fun homeArtIsReadFromZippedPack(@TempDir dir: Path) {
+        val game = dir.resolve("game")
+        val packs = Files.createDirectories(game.resolve("resourcepacks"))
+        val img = java.awt.image.BufferedImage(64, 32, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        val png = java.io.ByteArrayOutputStream().also { javax.imageio.ImageIO.write(img, "png", it) }.toByteArray()
+        ZipOutputStream(Files.newOutputStream(packs.resolve("Resource Pack.zip"))).use {
+            it.putNextEntry(ZipEntry(HeroArt.ART)); it.write(png); it.closeEntry()
+        }
+        val cache = dir.resolve("cache")
+        val art = HeroArt(game, cache, ScreenshotLibrary(game, cache)).image()
+        assertTrue(art != null && art.size > 100)
+        assertNull(HeroArt(dir.resolve("empty"), cache, ScreenshotLibrary(dir.resolve("empty"), cache)).image())
     }
 }
