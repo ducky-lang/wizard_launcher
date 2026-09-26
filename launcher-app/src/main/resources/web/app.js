@@ -2,9 +2,9 @@
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  let lang = "en";
+  const lang = "en";
   const t = (key, vars = {}) => {
-    let s = (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key;
+    let s = I18N.en[key] || key;
     for (const [k, v] of Object.entries(vars)) s = s.split("{" + k + "}").join(String(v));
     return s;
   };
@@ -664,7 +664,6 @@
         </nav>
         <div class="stagger" style="display:flex;flex-direction:column;gap:18px">
           ${group("general", t("set.general"),
-            row(t("set.language"), t("set.language.d"), seg("language", [["en", "English"], ["vi", "Tiếng Việt"]])) +
             row(t("set.after"), t("set.after.d"), seg("after_launch", [["KEEP_OPEN", t("set.after.keep")], ["MINIMIZE", t("set.after.min")], ["CLOSE", t("set.after.close")]])) +
             row(t("set.updates"), t("set.updates.d"), toggle("check_updates")))}
           ${group("game", t("set.game"),
@@ -699,7 +698,6 @@
     $$("[data-seg]", el).forEach((g) => $$("button", g).forEach((b) => b.addEventListener("click", () => {
       $$("button", g).forEach((x) => x.classList.toggle("active", x === b));
       setSetting(g.dataset.seg, b.dataset.v);
-      if (g.dataset.seg === "language") { lang = b.dataset.v; relabel(); }
     })));
     $$("[data-ram]", el).forEach((r) => {
       const paint = () => {
@@ -829,24 +827,22 @@
     let step = 0;
     let profile = state.settings.memory_profile || "BALANCED";
     const m = modal('<div class="onb" id="onb"></div>', { onClose: () => call("settings.set", { onboarding_done: true }) });
-    const icons = ["wand", "globe", "user", "memory", "sparkle"];
+    const icons = ["wand", "user", "memory", "sparkle"];
     const draw = (dir = 0) => {
       const n = step + 1;
       let extra = "";
-      if (step === 1) extra = `<div class="choice">${[["en", "English", "The castle speaks English"], ["vi", "Tiếng Việt", "Lâu đài nói tiếng Việt"]].map(([v, a, b]) => `<button data-lang="${v}" class="${lang === v ? "sel" : ""}">${ICONS.globe}<div><b>${a}</b><span>${b}</span></div></button>`).join("")}</div>`;
-      if (step === 2) extra = `<div class="choice">${state.info.microsoftAvailable ? `<button data-acct="ms">${ICONS.microsoft}<div><b>${t("acct.add.ms")}</b><span>${t("ms.body").split(".")[0]}.</span></div></button>` : ""}<button data-acct="offline">${ICONS.userPlus}<div><b>${t("acct.add.offline")}</b><span>${t("off.body").split(".")[0]}.</span></div></button></div>${state.selected ? `<p class="muted" style="margin-top:12px">${ICONS.check.replace("<svg", '<svg style="width:14px;height:14px;vertical-align:-2px;color:var(--ok)"')} ${esc(state.selected.name)}</p>` : ""}`;
-      if (step === 3) extra = `<div class="choice">${[["LOW", t("set.profile.low"), "~1.5 GB + 0.8 GB"], ["BALANCED", t("set.profile.balanced"), "~2-3 GB + 1.3 GB"], ["HIGH", t("set.profile.high"), "~3-4 GB + 2 GB"]].map(([v, a, b]) => `<button data-prof="${v}" class="${profile === v ? "sel" : ""}">${ICONS.memory}<div><b>${a}</b><span>${b}</span></div></button>`).join("")}</div>`;
+      if (step === 1) extra = `<div class="choice">${state.info.microsoftAvailable ? `<button data-acct="ms">${ICONS.microsoft}<div><b>${t("acct.add.ms")}</b><span>${t("ms.body").split(".")[0]}.</span></div></button>` : ""}<button data-acct="offline">${ICONS.userPlus}<div><b>${t("acct.add.offline")}</b><span>${t("off.body").split(".")[0]}.</span></div></button></div>${state.selected ? `<p class="muted" style="margin-top:12px">${ICONS.check.replace("<svg", '<svg style="width:14px;height:14px;vertical-align:-2px;color:var(--ok)"')} ${esc(state.selected.name)}</p>` : ""}`;
+      if (step === 2) extra = `<div class="choice">${[["LOW", t("set.profile.low"), "~1.5 GB + 0.8 GB"], ["BALANCED", t("set.profile.balanced"), "~2-3 GB + 1.3 GB"], ["HIGH", t("set.profile.high"), "~3-4 GB + 2 GB"]].map(([v, a, b]) => `<button data-prof="${v}" class="${profile === v ? "sel" : ""}">${ICONS.memory}<div><b>${a}</b><span>${b}</span></div></button>`).join("")}</div>`;
       $("#onb", m).innerHTML = `<div class="onb-art">${ICONS[icons[step]]}</div><h2>${t("onb." + n + ".t")}</h2><p class="sub">${t("onb." + n + ".b")}</p>${extra}
         <div class="actions" style="justify-content:space-between"><button class="ghost" data-nav="back" ${step === 0 ? "style='visibility:hidden'" : ""}>${t("btn.back")}</button>
-        <button class="btn" data-nav="next">${step === 4 ? t("btn.start") : t("btn.next")}</button></div>
-        <div class="dots">${[0, 1, 2, 3, 4].map((i) => `<i class="${i === step ? "on" : ""}"></i>`).join("")}</div>`;
+        <button class="btn" data-nav="next">${step === 3 ? t("btn.start") : t("btn.next")}</button></div>
+        <div class="dots">${[0, 1, 2, 3].map((i) => `<i class="${i === step ? "on" : ""}"></i>`).join("")}</div>`;
       if (dir) FX.restart($("#onb", m), dir > 0 ? "next" : "back");
-      $$("[data-lang]", m).forEach((b) => b.addEventListener("click", () => { lang = b.dataset.lang; call("settings.set", { language: lang }); relabel(); draw(); }));
       $$("[data-acct]", m).forEach((b) => b.addEventListener("click", () => (b.dataset.acct === "ms" ? microsoftLogin(draw) : offlineLogin(draw))));
       $$("[data-prof]", m).forEach((b) => b.addEventListener("click", () => { profile = b.dataset.prof; call("settings.set", { memory_profile: profile }); draw(); }));
       $('[data-nav="back"]', m).addEventListener("click", () => { step = Math.max(0, step - 1); draw(-1); });
       $('[data-nav="next"]', m).addEventListener("click", async () => {
-        if (step === 4) {
+        if (step === 3) {
           m.close();
           state.settings = await WL.call("settings.get");
           state.info = await WL.call("app.info");
@@ -857,15 +853,6 @@
       });
     };
     draw();
-  }
-
-  function relabel() {
-    document.documentElement.lang = lang;
-    const page = state.page;
-    buildNav();
-    go(page);
-    renderChips();
-    renderAccountChip();
   }
 
   async function refreshAccounts() {
@@ -936,14 +923,13 @@
   async function boot() {
     try {
       state.settings = await WL.call("settings.get");
-      lang = state.settings.language || "en";
       state.info = await WL.call("app.info");
       const logs = await WL.call("logs.recent").catch(() => ({ lines: [] }));
       state.logs = logs.lines || [];
       const g = await WL.call("game.status").catch(() => null);
       if (g) state.game = Object.assign(state.game, g);
     } catch (e) {
-      state.settings = state.settings || { language: "en", animations: true };
+      state.settings = state.settings || { animations: true };
       state.info = state.info || {};
     }
     FX.setEnabled(state.settings.animations !== false);

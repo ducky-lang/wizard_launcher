@@ -96,7 +96,7 @@ class WebApp(private val launcher: Launcher) : Bridge.Host {
         settings.log_severity = CefSettings.LogSeverity.LOGSEVERITY_WARNING
         settings.log_file = launcher.paths.logs.resolve("ui-engine.log").toString()
         settings.user_agent_product = "WizardLauncher/${BuildInfo.version}"
-        settings.locale = if (launcher.settings.language == "vi") "vi" else "en-US"
+        settings.locale = "en-US"
         settings.background_color = settings.ColorType(255, 7, 7, 12)
         builder.addJcefArgs(*PRIVATE_ARGS)
         if (!launcher.settings.hardwareAcceleration) builder.addJcefArgs("--disable-gpu", "--disable-gpu-compositing")

@@ -15,7 +15,6 @@ class Settings(private val file: Path) {
     var afterLaunch = AfterLaunch.MINIMIZE
     var offlineName = ""
     var keepLogDays = 7
-    var language = "en"
     var animations = true
     var hardwareAcceleration = true
     var gameWidth = 0
@@ -48,7 +47,6 @@ class Settings(private val file: Path) {
         if (o.has("after_launch")) afterLaunch = runCatching { AfterLaunch.valueOf(o.get("after_launch").asString) }.getOrDefault(afterLaunch)
         if (o.has("offline_name")) offlineName = o.get("offline_name")?.takeIf { it.isJsonPrimitive }?.asString?.takeIf(::validName) ?: ""
         if (o.has("keep_log_days")) keepLogDays = runCatching { o.get("keep_log_days").asInt.coerceIn(1, 365) }.getOrDefault(keepLogDays)
-        if (o.has("language")) language = o.get("language").asString.takeIf { it in LANGUAGES } ?: language
         animations = bool(o, "animations", animations)
         hardwareAcceleration = bool(o, "hardware_acceleration", hardwareAcceleration)
         if (o.has("game_width")) gameWidth = runCatching { o.get("game_width").asInt }.getOrDefault(0).let { if (it <= 0) 0 else it.coerceIn(640, 7680) }
@@ -70,7 +68,6 @@ class Settings(private val file: Path) {
         addProperty("after_launch", afterLaunch.name)
         addProperty("offline_name", offlineName)
         addProperty("keep_log_days", keepLogDays)
-        addProperty("language", language)
         addProperty("animations", animations)
         addProperty("hardware_acceleration", hardwareAcceleration)
         addProperty("game_width", gameWidth)
@@ -106,8 +103,6 @@ class Settings(private val file: Path) {
             runCatching { o.get(key).asInt }.getOrDefault(0).let { if (it <= 0) 0 else it.coerceIn(512, 32768) }
         private fun bool(o: JsonObject, key: String, default: Boolean) =
             runCatching { o.get(key).asBoolean }.getOrDefault(default)
-
-        val LANGUAGES = setOf("en", "vi")
 
         fun validName(name: String) = Regex("^[A-Za-z0-9_]{3,16}$").matches(name)
     }

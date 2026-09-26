@@ -7,7 +7,7 @@ data class Target(val loader: String, val java: Int, val sources: String, val mi
 
 val targets = mapOf(
     "1.20.1" to Target("0.15.11", 17, "v1_20_1"),
-    "1.21.1" to Target("0.16.9", 21, "v1_21_1", listOf("EffectPacketMixin", "MobEffectInstanceAccessor")),
+    "1.21.1" to Target("0.16.9", 21, "v1_21_1", listOf("EffectPacketMixin", "MobEffectInstanceAccessor", "RidingMixin")),
 )
 val mc = (findProperty("mc") as String?) ?: "1.20.1"
 val target = targets[mc] ?: error("Wizard Legacy Packs does not support Minecraft $mc (supported: ${targets.keys})")
