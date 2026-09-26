@@ -69,8 +69,8 @@ const I18N = {
     "time.never": "never", "time.now": "just now", "time.min": "{n} min ago", "time.hour": "{n} h ago", "time.day": "{n} d ago",
     "news.1": "Minecraft 1.21.1 joins 1.20.1: pick the version beside Play. Each keeps its own mods, settings and screenshots.",
     "news.2": "Import Fabric modpacks from Modrinth (.mrpack) as new installations.",
-    "news.3": "Resource packs from 1.13 to 1.19 load natively in both versions; old GUI sheets are cut into the new 1.21 sprites automatically.",
-    "news.4": "The resource pack updates when the server copy changes, and download problems are reported instead of silently skipped.",
+    "news.3": "On 1.21.1, conversations hold you still again, NPCs stop bobbing and the castle's own HUD shows exactly as on 1.20.1.",
+    "news.4": "Both versions now run the lightweight FPS Modpack: Sodium, Iris and ImmediatelyFast, without extra client mods.",
     "news.5": "Faster start: the castle downloads alongside the game, the pack installs without unpacking and Java 21 reuses a class cache.",
   },
   vi: {
@@ -143,8 +143,8 @@ const I18N = {
     "time.never": "chưa bao giờ", "time.now": "vừa xong", "time.min": "{n} phút trước", "time.hour": "{n} giờ trước", "time.day": "{n} ngày trước",
     "news.1": "Có thêm Minecraft 1.21.1 bên cạnh 1.20.1: chọn phiên bản ngay cạnh nút Chơi. Mỗi bản có mod, cài đặt và ảnh chụp riêng.",
     "news.2": "Nhập modpack Fabric từ Modrinth (.mrpack) thành bản cài mới.",
-    "news.3": "Resource pack 1.13 đến 1.19 được nạp trực tiếp trên cả hai phiên bản; ảnh GUI kiểu cũ được tự cắt thành sprite mới của 1.21.",
-    "news.4": "Resource pack tự cập nhật khi bản trên máy chủ thay đổi, lỗi tải được báo rõ thay vì bị bỏ qua.",
+    "news.3": "Trên 1.21.1, khi nói chuyện nhân vật đứng yên trở lại, NPC hết lắc lên xuống và HUD riêng của lâu đài hiển thị y như 1.20.1.",
+    "news.4": "Cả hai phiên bản giờ dùng FPS Modpack gọn nhẹ: Sodium, Iris và ImmediatelyFast, không kèm mod client thừa.",
     "news.5": "Khởi động nhanh hơn: lâu đài tải song song với game, pack cài không cần giải nén và Java 21 dùng lại bộ nhớ đệm class.",
   },
 };

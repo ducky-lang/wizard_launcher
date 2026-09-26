@@ -126,6 +126,13 @@ flowchart LR
 
 The installer carries its own Java 17 runtime, which runs the launcher, the world server and the 1.20.1 client. Minecraft 1.21.1 needs Java 21: the first time you play it, the launcher fetches Mojang's own Java 21 runtime (verified file by file against Mojang's manifest) into the data folder, once. A Java set in Settings is used instead when it is new enough.
 
+### The castle on 1.21.1
+
+The bundled mod also keeps two 1.16.5 behaviours that newer clients changed, so the castle plays the same on 1.21.1 as on 1.20.1:
+
+- **Effect strengths.** Minecraft 1.20.5 clamps effect amplifiers to 0–255, but 1.16.5 maps rely on negative strengths, such as levitation 255 (signed −1) to hold the player perfectly still during conversations. Effects coming from the local world keep their 1.16.5 strength.
+- **Hidden HUD parts.** When a pack blanks out parts of the old GUI sheets (hotbar, hearts, boss bars) to draw its own HUD, the matching 1.21.1 sprites stay blank instead of falling back to the vanilla graphics.
+
 ### Speed
 
 - The castle and its resource pack download **alongside** Minecraft, Fabric, the modpack and Java instead of before them, and the modpack's mods download in parallel.

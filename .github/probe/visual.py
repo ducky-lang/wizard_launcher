@@ -71,16 +71,29 @@ for step in range(16):
     key("f")
 time.sleep(5)
 shot("end")
+time.sleep(30)
+shot("room")
 key("F3")
 time.sleep(1.5)
-shot("hover-before", "700x420+0+0")
-key("t")
-time.sleep(1)
-xdo("type", "--delay", "40", "/effect give @s minecraft:levitation 30 255 true")
-key("Return")
-for t in (1, 3, 6, 10):
-    time.sleep(t - (0 if t == 1 else {3: 1, 6: 3, 10: 6}[t]))
-    shot(f"hover-{t}s", "700x420+0+0")
+
+def command(text):
+    key("t")
+    time.sleep(1)
+    xdo("type", "--delay", "40", text)
+    key("Return")
+
+F3 = "700x420+0+0"
+shot("control-before", F3)
+command("/effect give @s minecraft:levitation 3 1 true")
+time.sleep(2.5)
+shot("control-2s", F3)
+command("/effect clear @s")
+time.sleep(6)
+shot("hover-before", F3)
+command("/effect give @s minecraft:levitation 30 255 true")
+for t in (2, 5, 9):
+    time.sleep(3 if t == 2 else (3 if t == 5 else 4))
+    shot(f"hover-{t}s", F3)
 shot("hover-full")
 t = text()
 chat = [l for l in t.splitlines() if "[CHAT]" in l]
