@@ -26,14 +26,14 @@ adv = [n for n in names if "/advancements/" in n and n.endswith(".json")]
 print("\nadvancements", len(adv))
 trig = collections.Counter(); disp = 0
 for n in adv:
-    try: o = json.loads(z.read(n).decode("utf-8", "replace"))
+    try: o = json.JSONDecoder().raw_decode(z.read(n).decode("utf-8", "replace").strip())[0]
     except Exception as e: print("bad", n, e); continue
     for c in (o.get("criteria") or {}).values(): trig[c.get("trigger")] += 1
     if "display" in o: disp += 1
 print("with display", disp, "triggers", trig.most_common())
 shown = 0
 for n in adv:
-    o = json.loads(z.read(n).decode("utf-8", "replace"))
+    o = json.JSONDecoder().raw_decode(z.read(n).decode("utf-8", "replace").strip())[0]
     if "display" in o and shown < 6:
         shown += 1; print("ADV", n, json.dumps(o)[:900])
 for n in adv[:3]:
@@ -43,3 +43,13 @@ lvl = [n for n in names if n.endswith("level.dat")]
 print(lvl)
 print([n for n in names if "/advancements/" in n and not n.endswith(".json")][:10])
 print("playerdata adv", [n for n in names if "/advancements/" in n and n.count("/") <= 3][:10])
+
+rp = zipfile.ZipFile(io.BytesIO(get("https://huggingface.co/datasets/Foxybeo/wz_launcher/resolve/main/Resource%20Pack.zip?download=true")))
+rn = rp.namelist()
+print("\nRP particles", [n for n in rn if "/particles/" in n or "textures/particle/" in n][:40])
+for n in rn:
+    if n.endswith("models/item/iron_hoe.json") or n.endswith("models/item/diamond_hoe.json") or n.endswith("models/item/carrot_on_a_stick.json"):
+        t = rp.read(n).decode("utf-8", "replace")
+        print("MODEL", n, len(t), t[:1500])
+print("RP toasts/adv", [n for n in rn if "toast" in n or "advancements" in n])
+print("RP item models", collections.Counter(n.split("/")[-1] for n in rn if "/models/item/" in n).most_common(30))
