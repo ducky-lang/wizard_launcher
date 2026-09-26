@@ -23,6 +23,7 @@ class Settings(private val file: Path) {
     var fullscreen = false
     var checkUpdates = true
     var onboardingDone = false
+    var selectedInstance = ""
 
     enum class MemoryProfile { LOW, BALANCED, HIGH }
     enum class AfterLaunch { KEEP_OPEN, MINIMIZE, CLOSE }
@@ -55,6 +56,7 @@ class Settings(private val file: Path) {
         fullscreen = bool(o, "fullscreen", fullscreen)
         checkUpdates = bool(o, "check_updates", checkUpdates)
         onboardingDone = bool(o, "onboarding_done", onboardingDone)
+        if (o.has("selected_instance")) selectedInstance = o.get("selected_instance")?.takeIf { it.isJsonPrimitive }?.asString?.takeIf { Regex("^[A-Za-z0-9._-]{1,64}$").matches(it) } ?: selectedInstance
     }
 
     fun toJson(): JsonObject = JsonObject().apply {
@@ -76,6 +78,7 @@ class Settings(private val file: Path) {
         addProperty("fullscreen", fullscreen)
         addProperty("check_updates", checkUpdates)
         addProperty("onboarding_done", onboardingDone)
+        addProperty("selected_instance", selectedInstance)
     }
 
     fun save() = Json.write(file, toJson())

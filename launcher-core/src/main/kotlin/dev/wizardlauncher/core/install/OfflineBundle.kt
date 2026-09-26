@@ -15,16 +15,18 @@ import java.util.zip.ZipOutputStream
 
 object OfflineBundle {
     private const val MANIFEST = "wizard-bundle.json"
-    private val INCLUDE = listOf("resources/client", "resources/copy", "install_state.json")
+    private val INCLUDE = listOf("resources/client", "resources/copy", "resources/runtimes", "install_state.json")
 
     fun export(paths: AppPaths, target: Path, progress: Progress = Progress.NONE) {
         val files = INCLUDE.map { paths.root.resolve(it) }.filter(Files::exists).flatMap { root ->
             if (Files.isDirectory(root)) Files.walk(root).use { s -> s.filter(Files::isRegularFile).toList() } else listOf(root)
         }.filterNot { it.fileName.toString().endsWith(".part") }
         val manifest = JsonObject().apply {
-            addProperty("format", 1)
+            addProperty("format", 2)
             addProperty("client_version", Catalog.current.minecraft.clientVersion)
-            addProperty("modpack", "${Catalog.current.modpack.id}@${Catalog.current.modpack.version}")
+            add("instances", com.google.gson.JsonArray().apply {
+                Catalog.current.instances.filter { Files.isDirectory(paths.gameDir(it.id)) }.forEach { add("${it.id}:${it.modpack.id}@${it.modpack.version}") }
+            })
         }
         val hashes = JsonObject()
         val tmp = target.resolveSibling(target.fileName.toString() + ".tmp")
@@ -54,7 +56,7 @@ object OfflineBundle {
         ZipFile(bundle.toFile()).use { zip ->
             val manifest = zip.getEntry(MANIFEST)?.let { com.google.gson.JsonParser.parseString(zip.getInputStream(it).readBytes().toString(Charsets.UTF_8)).asJsonObject }
                 ?: throw LauncherException("This is not a Wizard Launcher offline bundle.")
-            if (manifest.get("client_version")?.asString != Catalog.current.minecraft.clientVersion) {
+            if ((manifest.get("format")?.asInt ?: 1) < 2 && manifest.get("client_version")?.asString != Catalog.current.minecraft.clientVersion) {
                 throw LauncherException("This bundle is for Minecraft ${manifest.get("client_version")?.asString}, not ${Catalog.current.minecraft.clientVersion}.")
             }
             val files = manifest.getAsJsonObject("files").entrySet()
@@ -78,6 +80,7 @@ object OfflineBundle {
             progress.update(null, "Installing bundle...")
             SafeZip.copyTree(staging, paths.root)
             SafeZip.deleteTree(staging)
+            paths.ensure()
             Log.info("Offline bundle installed (${files.size} files). You can play without internet now.")
         }
     }

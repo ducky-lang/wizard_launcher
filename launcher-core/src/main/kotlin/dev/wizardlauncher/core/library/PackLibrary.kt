@@ -19,7 +19,7 @@ data class PackInfo(
     val hasIcon: Boolean,
 )
 
-class PackLibrary(private val gameDir: Path) {
+class PackLibrary(private val gameDir: Path, private val targetFormat: Int = LegacyTranslator.TARGET_FORMAT) {
     private val dir: Path get() = gameDir.resolve("resourcepacks")
     private val options: Path get() = gameDir.resolve("options.txt")
 
@@ -36,7 +36,7 @@ class PackLibrary(private val gameDir: Path) {
                     val root = com.google.gson.JsonParser.parseString(String(meta, Charsets.UTF_8)).asJsonObject
                     text(root.getAsJsonObject("pack").get("description"))
                 }.getOrDefault("")
-                PackInfo(name, description, format, LegacyTranslator.needsTranslation(format), "file/$name" in enabled,
+                PackInfo(name, description, format, LegacyTranslator.needsTranslation(format, targetFormat), "file/$name" in enabled,
                     Files.isDirectory(path), runCatching { read(path, "pack.png") != null }.getOrDefault(false))
             }
             .sortedWith(compareBy({ !it.enabled }, { it.name.lowercase() }))

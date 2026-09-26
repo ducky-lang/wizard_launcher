@@ -2,9 +2,9 @@ package dev.wizardlauncher.core
 
 import dev.wizardlauncher.core.auth.Account
 import dev.wizardlauncher.core.auth.AccountManager
-import dev.wizardlauncher.core.game.ModConfigs
 import dev.wizardlauncher.core.game.ClientRunner
 import dev.wizardlauncher.core.game.GameOptions
+import dev.wizardlauncher.core.game.ModConfigs
 import dev.wizardlauncher.core.game.ProcessSupervisor
 import dev.wizardlauncher.core.game.ServerRunner
 import dev.wizardlauncher.core.game.ServersDat
@@ -15,8 +15,11 @@ import dev.wizardlauncher.core.install.ModpackInstaller
 import dev.wizardlauncher.core.install.Progress
 import dev.wizardlauncher.core.install.SafeZip
 import dev.wizardlauncher.core.install.VersionProfile
+import dev.wizardlauncher.core.instance.Instance
+import dev.wizardlauncher.core.instance.InstanceManager
 import dev.wizardlauncher.core.net.SecureDownloader
 import dev.wizardlauncher.core.runtime.JavaLocator
+import dev.wizardlauncher.core.runtime.JavaRuntimes
 import dev.wizardlauncher.core.security.SecretStore
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -27,6 +30,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 
 class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
@@ -35,6 +39,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
     val supervisor = ProcessSupervisor(paths.root.resolve("runtime_state.json"))
     val secrets = SecretStore(paths.secrets)
     val accounts = AccountManager(paths.root.resolve("account.json"), secrets, settings)
+    val instances = InstanceManager(paths, settings)
     private val playLock = ReentrantLock()
     @Volatile var server: ServerRunner? = null
         private set
@@ -43,17 +48,34 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         Log.init(paths.logs, settings.keepLogDays)
         Catalog.load(paths.root)
         Bootstrap.copyBundledResources(paths)
+        paths.instanceId = instances.selected().id
     }
 
     private fun downloader(domains: Set<String>) = Catalog.current.download.let {
         SecureDownloader(domains, it.maxRetries, it.backoffMs)
     }
 
-    fun readyOffline(): Boolean {
-        val modpack = ModpackInstaller(paths, state, downloader(Catalog.current.download.mods), Progress.NONE)
-        return modpack.isInstalled() &&
-            MinecraftInstaller(paths, state, downloader(Catalog.current.download.game), Progress.NONE).isInstalled(modpack.loaderVersion()) &&
-            ContentInstaller(paths, state, downloader(Catalog.current.download.content), Progress.NONE).isWorldInstalled()
+    inner class Setup(val instance: Instance, val progress: Progress) {
+        private val catalog = Catalog.current
+        val gameDir: Path = paths.gameDir(instance.id)
+        val content = ContentInstaller(paths, state, downloader(catalog.download.content), progress, online = !settings.offlineOnly)
+        val modpack = ModpackInstaller(paths, state, downloader(instance.modHosts), progress, instance)
+        val game = MinecraftInstaller(paths, state, downloader(catalog.download.game), progress, instance.minecraft)
+        val runtimes = JavaRuntimes(paths, settings, downloader(catalog.download.game), progress)
+
+        fun profileOrNull(): VersionProfile? = runCatching { VersionProfile.load(paths, game.fabricId(modpack.loaderVersion())) }.getOrNull()
+
+        fun javaFor(profile: VersionProfile) =
+            runtimes.locate(profile.javaMajor ?: instance.requiredJava, profile.javaComponent, online = !settings.offlineOnly)
+    }
+
+    fun setup(instance: Instance = instances.selected(), progress: Progress = Progress.NONE) = Setup(instance, progress)
+
+    fun readyOffline(instance: Instance = instances.selected()): Boolean {
+        val s = setup(instance)
+        if (!s.modpack.isInstalled() || !s.game.isInstalled(s.modpack.loaderVersion()) || !s.content.isWorldInstalled()) return false
+        val profile = s.profileOrNull() ?: return false
+        return s.runtimes.hasJava(profile.javaMajor ?: instance.requiredJava, profile.javaComponent)
     }
 
     fun play(account: Account, progress: Progress, stage: (Int) -> Unit = {}): Process {
@@ -64,46 +86,63 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             supervisor.reapOrphans()
             if (supervisor.isRunning("client")) throw LauncherException("The game is already running.")
             val catalog = Catalog.current
+            val instance = instances.selected()
+            val s = setup(instance, progress)
             val offline = settings.offlineOnly
-            if (!readyOffline()) {
+            if (!readyOffline(instance)) {
                 if (offline) throw LauncherException(
-                    "Offline mode is on, but the game is not fully installed yet.\n\n" +
+                    "Offline mode is on, but ${instance.name} is not fully installed yet.\n\n" +
                         "Turn offline mode off and connect once, or import an offline bundle (Tools menu).")
                 ContentInstaller.requireSpace(paths, catalog.approxDownloadMb)
             }
-
-            val java = JavaLocator.find(settings, catalog.minecraft.requiredJava)
-            val content = ContentInstaller(paths, state, downloader(catalog.download.content), progress)
-            val modpack = ModpackInstaller(paths, state, downloader(catalog.download.mods), progress)
-            val game = MinecraftInstaller(paths, state, downloader(catalog.download.game), progress)
+            val serverJava = JavaLocator.find(settings, catalog.minecraft.requiredJava)
 
             stage(0)
             progress.update(0.02, "Preparing the castle...")
-            content.ensureWorld()
+            val latest = AtomicReference<Pair<Double?, String>>(null to "Downloading the castle...")
+            val quiet = Progress { fraction, message -> latest.set(fraction to message) }
+            val contentJob = FutureTask {
+                val background = ContentInstaller(paths, state, downloader(catalog.download.content), quiet, online = !offline)
+                background.ensureWorld()
+                background.fetch(catalog.resource("resource_pack"))
+                Unit
+            }
+            Thread(contentJob, "content-download").apply { isDaemon = true; start() }
+
             stage(1)
-            if (!modpack.isInstalled()) modpack.fetchArchive()
-            val versionId = game.ensure(modpack.loaderVersion())
+            if (!s.modpack.isInstalled()) s.modpack.fetchArchive()
+            val versionId = s.game.ensure(s.modpack.loaderVersion())
+            val profile = VersionProfile.load(paths, versionId)
+            val java = s.javaFor(profile)
             stage(2)
-            modpack.ensure()
-            ModConfigs.enforce(paths.gameDir)
-            val clientWaitsForWorld = content.ensureLegacyPackSupport()
-            val packName = runCatching { content.ensureResourcePack() }
-                .onFailure { Log.error("The resource pack could not be installed; continuing without it: ${it.message}", it) }
-                .getOrNull()
+            s.modpack.ensure()
+            ModConfigs.enforce(s.gameDir)
+            val clientWaitsForWorld = s.content.ensureLegacyPackSupport(instance, s.gameDir)
+            val legacyReader = Files.isRegularFile(s.gameDir.resolve("mods").resolve(ContentInstaller.LEGACY_MOD))
+            while (!contentJob.isDone) {
+                val (fraction, message) = latest.get()
+                progress.update(fraction, message)
+                Thread.sleep(250)
+            }
+            try {
+                contentJob.get()
+            } catch (e: ExecutionException) {
+                throw e.cause as? Exception ?: e
+            }
+            val packName = s.content.ensureResourcePack(s.gameDir)
 
             stage(3)
             progress.update(0.75, "Opening the portal...")
-            val server = ServerRunner(paths, settings, state, supervisor, java, tool("wizard-server-host.jar"))
+            val server = ServerRunner(paths, settings, state, supervisor, serverJava, tool("wizard-server-host.jar"))
             this.server = server
             server.verifyBundledJars()
             server.configure(account.name)
 
             val address = "127.0.0.1:${server.ports.proxy}"
-            ServersDat.upsert(paths.gameDir.resolve("servers.dat"), catalog.server.entryName, address)
-            packName?.let {
-                GameOptions.enableResourcePack(paths.gameDir.resolve("options.txt"), it,
-                    compatible = true, stale = listOf("$it (1.20.1).zip"))
-            }
+            inheritOptions(instance, s.gameDir)
+            ServersDat.upsert(s.gameDir.resolve("servers.dat"), catalog.server.entryName, address)
+            GameOptions.enableResourcePack(s.gameDir.resolve("options.txt"), packName,
+                compatible = legacyReader, stale = s.content.staleNames().filter { it != packName })
 
             if (clientWaitsForWorld) {
                 serverStart = FutureTask { server.start() }
@@ -113,10 +152,10 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             }
 
             stage(4)
-            progress.update(0.9, "Launching Minecraft...")
-            Log.info("Launching Minecraft as ${account.name}${if (account.isMicrosoft) "" else " (offline name)"}...")
-            val client = ClientRunner(paths, settings, supervisor, java, tool("wizard-client-boot.jar"))
-                .launch(VersionProfile.load(paths, versionId), account, address, waitForWorld = clientWaitsForWorld)
+            progress.update(0.9, "Launching Minecraft ${instance.minecraft}...")
+            Log.info("Launching ${instance.name} as ${account.name}${if (account.isMicrosoft) "" else " (offline name)"} with Java ${java.major}...")
+            val client = ClientRunner(paths, settings, supervisor, java.path, tool("wizard-client-boot.jar"), s.gameDir, java.major)
+                .launch(profile, account, address, waitForWorld = clientWaitsForWorld)
             serverStart?.let { start ->
                 progress.update(0.95, "Minecraft is loading while the world finishes starting...")
                 try {
@@ -142,59 +181,72 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
         }
     }
 
-    fun verifyInstall(progress: Progress, repair: Boolean = true): String {
-        val catalog = Catalog.current
-        val modpack = ModpackInstaller(paths, state, downloader(catalog.download.mods), progress)
-        val game = MinecraftInstaller(paths, state, downloader(catalog.download.game), progress)
-        val content = ContentInstaller(paths, state, downloader(catalog.download.content), progress)
-        if (repair) {
-            if (!modpack.isInstalled()) modpack.fetchArchive()
-            game.ensure(modpack.loaderVersion(), verify = true)
-            modpack.ensure()
-            content.ensureLegacyPackSupport()
+    private fun inheritOptions(instance: Instance, gameDir: Path) {
+        val options = gameDir.resolve("options.txt")
+        if (Files.exists(options)) return
+        val donor = instances.all().filter { it.id != instance.id }
+            .map { paths.gameDir(it.id).resolve("options.txt") }
+            .filter(Files::isRegularFile)
+            .maxByOrNull { Files.getLastModifiedTime(it) } ?: return
+        runCatching {
+            Files.createDirectories(gameDir)
+            Files.copy(donor, options)
+            Log.info("Brought your controls and video settings over from ${donor.parent.parent.fileName}.")
         }
-        ModConfigs.enforce(paths.gameDir)
-        val loader = modpack.loaderVersion()
-        val missing = game.missingFiles(loader)
-        val java = JavaLocator.find(settings, catalog.minecraft.requiredJava)
-        val profile = VersionProfile.load(paths, game.fabricId(loader))
-        val boot = tool("wizard-client-boot.jar")
-        val command = ClientRunner(paths, settings, supervisor, java, boot)
-            .command(profile, Account.offline("WizardCheck"), "127.0.0.1:25566")
-        val legacy = Files.isRegularFile(paths.gameDir.resolve("mods").resolve(ContentInstaller.LEGACY_MOD))
+    }
+
+    fun verifyInstall(progress: Progress, repair: Boolean = true, instanceId: String? = null): String {
+        val catalog = Catalog.current
+        val instance = instanceId?.let { instances.require(it) } ?: instances.selected()
+        val s = setup(instance, progress)
+        if (repair) {
+            if (!s.modpack.isInstalled()) s.modpack.fetchArchive()
+            s.game.ensure(s.modpack.loaderVersion(), verify = true)
+            s.modpack.ensure()
+            s.content.ensureLegacyPackSupport(instance, s.gameDir)
+        }
+        ModConfigs.enforce(s.gameDir)
+        val loader = s.modpack.loaderVersion()
+        val missing = s.game.missingFiles(loader)
         if (missing.isNotEmpty()) {
             throw LauncherException("${missing.size} game file(s) are missing:\n" + missing.take(10).joinToString("\n"))
         }
+        val profile = VersionProfile.load(paths, s.game.fabricId(loader))
+        val java = s.javaFor(profile)
+        val boot = tool("wizard-client-boot.jar")
+        val command = ClientRunner(paths, settings, supervisor, java.path, boot, s.gameDir, java.major)
+            .command(profile, Account.offline("WizardCheck"), "127.0.0.1:25566")
+        val legacy = Files.isRegularFile(s.gameDir.resolve("mods").resolve(ContentInstaller.LEGACY_MOD))
         return buildString {
+            appendLine("Installation: ${instance.name} (${instance.id})")
             appendLine("Game: ${profile.id} (${profile.libraries.size} libraries, main ${profile.mainClass})")
-            appendLine("Modpack: ${catalog.modpack.name} ${catalog.modpack.version}, installed=${modpack.isInstalled()}")
-            appendLine("Legacy pack support: ${if (legacy) "installed" else "not bundled"}")
-            appendLine("Java: $java")
+            appendLine("Modpack: ${s.modpack.name} ${s.modpack.version}, installed=${s.modpack.isInstalled()}")
+            appendLine("Legacy pack support: ${if (legacy) "installed" else "not available"}")
+            appendLine("Java ${java.major}: ${java.path}")
             appendLine("Launch command: ${command.size} arguments, all ${profile.libraries.size + 2} classpath entries present")
         }
     }
 
-    fun smokeClient(progress: Progress, timeoutSeconds: Long, pack: Path?): String {
-        verifyInstall(progress)
-        val catalog = Catalog.current
-        val modpack = ModpackInstaller(paths, state, downloader(catalog.download.mods), progress)
-        val game = MinecraftInstaller(paths, state, downloader(catalog.download.game), progress)
-        val java = JavaLocator.find(settings, catalog.minecraft.requiredJava)
+    fun smokeClient(progress: Progress, timeoutSeconds: Long, pack: Path?, instanceId: String? = null): String {
+        verifyInstall(progress, instanceId = instanceId)
+        val instance = instanceId?.let { instances.require(it) } ?: instances.selected()
+        val s = setup(instance, progress)
+        val profile = VersionProfile.load(paths, s.game.fabricId(s.modpack.loaderVersion()))
+        val java = s.javaFor(profile)
         var packName: String? = null
         if (pack != null) {
             packName = pack.fileName.toString()
-            val target = paths.gameDir.resolve("resourcepacks").resolve(packName)
+            val target = s.gameDir.resolve("resourcepacks").resolve(packName)
             Files.createDirectories(target.parent)
             if (Files.isDirectory(pack)) SafeZip.copyTree(pack, target) else Files.copy(pack, target, StandardCopyOption.REPLACE_EXISTING)
-            GameOptions.enableResourcePack(paths.gameDir.resolve("options.txt"), packName, compatible = true, stale = emptyList())
+            GameOptions.enableResourcePack(s.gameDir.resolve("options.txt"), packName, compatible = true, stale = emptyList())
         }
-        val log = paths.gameDir.resolve("logs").resolve("latest.log")
+        val log = s.gameDir.resolve("logs").resolve("latest.log")
         Files.deleteIfExists(log)
         val closedPort = ServerSocket(0, 0, InetAddress.getLoopbackAddress()).use { it.localPort }
-        progress.update(null, "Starting Minecraft for a smoke test...")
-        val client = ClientRunner(paths, settings, supervisor, java, tool("wizard-client-boot.jar"))
-            .launch(VersionProfile.load(paths, game.fabricId(modpack.loaderVersion())), Account.offline("WizardSmoke"),
-                "127.0.0.1:$closedPort", waitForWorld = true)
+        progress.update(null, "Starting Minecraft ${instance.minecraft} for a smoke test...")
+        val client = ClientRunner(paths, settings, supervisor, java.path, tool("wizard-client-boot.jar"), s.gameDir, java.major)
+            .launch(profile, Account.offline("WizardSmoke"), "127.0.0.1:$closedPort", waitForWorld = true)
         val deadline = System.currentTimeMillis() + timeoutSeconds * 1000
         val markers = linkedMapOf(
             "Fabric loaded mods" to Regex("Loading \\d+ mods"),
@@ -220,13 +272,13 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             it.contains("WizardLegacyPacks") || it.contains("Reloading ResourceManager") || it.contains("resource pack", ignoreCase = true) ||
                 (packName != null && it.contains(packName))
         }.take(25)
-        val culling = runCatching { Files.readAllLines(paths.gameDir.resolve("config").resolve("moreculling.toml")) }.getOrDefault(emptyList())
+        val culling = runCatching { Files.readAllLines(s.gameDir.resolve("config").resolve("moreculling.toml")) }.getOrDefault(emptyList())
             .any { it.replace(" ", "") == "useBlockStateCulling=false" }
         val brokenModels = if (packName == null) emptyList() else text.lines().filter {
             BROKEN_MODEL.containsMatchIn(it) && LEGACY_MODEL_IDS.containsMatchIn(it)
         }.take(10)
         return buildString {
-            appendLine("Client was ${if (alive) "running" else "not running (exit ${runCatching { client.exitValue() }.getOrDefault(-1)})"} at the end of the test")
+            appendLine("${instance.name}: client was ${if (alive) "running" else "not running (exit ${runCatching { client.exitValue() }.getOrDefault(-1)})"} at the end of the test")
             markers.keys.forEach { appendLine((if (it in seen) "[ok] " else "[--] ") + it) }
             appendLine((if (culling) "[ok] " else "[--] ") + "Culling matches vanilla for remodelled blocks")
             if (packName != null) {
@@ -262,7 +314,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             val rssMb = supervisor.get("server")?.let { residentMb(it.pid) }
             return buildString {
                 appendLine("World server: OK (${(System.currentTimeMillis() - started) / 1000}s to ready)")
-                appendLine("Bridge answers a 1.20.1 client as: ${version.get("name").asString}, protocol ${version.get("protocol").asInt}")
+                appendLine("Bridge answers a ${Catalog.current.minecraft.clientVersion} client as: ${version.get("name").asString}, protocol ${version.get("protocol").asInt}")
                 appendLine("Mode: ${Catalog.current.server.mode}, heap limit ${settings.effectiveServerRamMb} MB" +
                     (rssMb?.let { ", resident memory now $it MB" } ?: ""))
             }

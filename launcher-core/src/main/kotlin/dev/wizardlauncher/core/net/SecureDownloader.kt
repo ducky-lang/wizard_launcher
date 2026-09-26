@@ -26,12 +26,14 @@ class SecureDownloader(
     private val maxRetries: Int = 4,
     private val backoffMs: Long = 2000,
 ) {
-    private val client: HttpClient = HttpClient.newBuilder()
-        .followRedirects(HttpClient.Redirect.NEVER)
-        .connectTimeout(Duration.ofSeconds(15))
-        .sslContext(SSLContext.getDefault())
-        .sslParameters(SSLParameters().apply { protocols = arrayOf("TLSv1.3", "TLSv1.2") })
-        .build()
+    private val client: HttpClient by lazy {
+        HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .connectTimeout(Duration.ofSeconds(15))
+            .sslContext(SSLContext.getDefault())
+            .sslParameters(SSLParameters().apply { protocols = arrayOf("TLSv1.3", "TLSv1.2") })
+            .build()
+    }
 
     fun isAllowed(uri: URI): Boolean {
         if (uri.scheme != "https") return false

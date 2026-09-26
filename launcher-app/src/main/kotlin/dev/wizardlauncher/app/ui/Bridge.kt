@@ -10,7 +10,6 @@ import dev.wizardlauncher.core.LauncherException
 import dev.wizardlauncher.core.Log
 import dev.wizardlauncher.core.SystemInfo
 import dev.wizardlauncher.core.auth.MicrosoftAuth
-import dev.wizardlauncher.core.install.ContentInstaller
 import dev.wizardlauncher.core.install.OfflineBundle
 import dev.wizardlauncher.core.install.Progress
 import dev.wizardlauncher.core.library.CrashReports
@@ -23,8 +22,10 @@ import dev.wizardlauncher.core.library.UpdateChecker
 import dev.wizardlauncher.core.library.UpdateInfo
 import dev.wizardlauncher.core.library.Worlds
 import dev.wizardlauncher.core.install.ModpackInstaller
+import dev.wizardlauncher.core.instance.Instance
 import dev.wizardlauncher.core.net.Connectivity
 import dev.wizardlauncher.core.net.SecureDownloader
+import dev.wizardlauncher.legacy.LegacyTranslator
 import dev.wizardlauncher.legacy.PackExporter
 import java.awt.Desktop
 import java.awt.Toolkit
@@ -50,9 +51,10 @@ class Bridge(private val launcher: Launcher, private val host: Host) {
     private val gson = Gson()
     private val pool = Executors.newFixedThreadPool(4) { r -> Thread(r, "ui-bridge").apply { isDaemon = true } }
     private val paths = launcher.paths
-    private val modpack get() = ModpackInstaller(paths, launcher.state, SecureDownloader(Catalog.current.download.mods), Progress.NONE)
+    private val instance get() = launcher.instances.selected()
+    private val modpack get() = instance.let { ModpackInstaller(paths, launcher.state, SecureDownloader(it.modHosts), Progress.NONE, it) }
     private val mods get() = ModLibrary(paths.gameDir.resolve("mods")) { modpack.managedFiles() }
-    private val packs get() = PackLibrary(paths.gameDir)
+    private val packs get() = PackLibrary(paths.gameDir, instance.packFormat ?: LegacyTranslator.TARGET_FORMAT)
     private val shaders get() = ShaderLibrary(paths.gameDir)
     private val shots get() = ScreenshotLibrary(paths.gameDir, paths.root.resolve("cache"))
     private val worlds get() = Worlds(paths.worldDir, paths.backups)
@@ -117,6 +119,18 @@ class Bridge(private val launcher: Launcher, private val host: Host) {
         "game.status" -> mapOf("state" to gameState)
         "game.play" -> play()
         "game.stop" -> { launcher.stop { host.emit("launch.progress", mapOf("fraction" to null, "message" to it, "step" to 3)) }; null }
+        "instances.list" -> instances()
+        "instances.select" -> { requireIdle(); launcher.instances.select(a.str("id")); host.emit("info.changed", null); instances() }
+        "instances.import" -> host.chooseFiles("Import a modpack", false, false, null, FileNameExtensionFilter("Modrinth modpack", "mrpack"), false).firstOrNull()
+            ?.let { file ->
+                requireIdle()
+                val added = launcher.instances.importModpack(file)
+                launcher.instances.select(added.id)
+                host.emit("info.changed", null)
+                instances()
+            }
+        "instances.remove" -> { requireIdle(); launcher.instances.remove(a.str("id")); host.emit("info.changed", null); instances() }
+        "instances.openFolder" -> open(paths.gameDir.also(Files::createDirectories))
         "mods.list" -> mods.list()
         "mods.toggle" -> mods.setEnabled(a.str("name"), a.get("enabled").asBoolean)
         "mods.remove" -> mods.remove(a.str("name"))
@@ -166,14 +180,16 @@ class Bridge(private val launcher: Launcher, private val host: Host) {
     private fun info(): Map<String, Any?> {
         val s = launcher.settings
         val catalog = Catalog.current
+        val current = instance
         return mapOf(
             "version" to BuildInfo.version,
-            "clientVersion" to catalog.minecraft.clientVersion,
+            "clientVersion" to current.minecraft,
             "serverVersion" to catalog.minecraft.serverVersion,
-            "modpack" to "${catalog.modpack.name} ${catalog.modpack.version}",
+            "modpack" to "${current.modpack.name} ${current.modpack.version}".trim(),
+            "instance" to describe(current),
             "online" to online,
-            "offlineReady" to runCatching { launcher.readyOffline() }.getOrDefault(false),
-            "legacySupport" to Files.isRegularFile(paths.resources.resolve("mods").resolve(ContentInstaller.LEGACY_MOD)),
+            "offlineReady" to runCatching { launcher.readyOffline(current) }.getOrDefault(false),
+            "legacySupport" to Files.isRegularFile(paths.resources.resolve("mods").resolve(current.legacyMod)),
             "microsoftAvailable" to launcher.accounts.microsoftAvailable,
             "downloadGb" to (catalog.approxDownloadMb / 1000 + 1),
             "dataDir" to paths.root.toString(),
@@ -182,6 +198,25 @@ class Bridge(private val launcher: Launcher, private val host: Host) {
             "update" to update,
         )
     }
+
+    private fun instances(): Map<String, Any?> {
+        val selected = instance
+        return mapOf(
+            "selected" to selected.id,
+            "instances" to launcher.instances.all().map { describe(it) },
+        )
+    }
+
+    private fun describe(i: Instance): Map<String, Any?> = mapOf(
+        "id" to i.id,
+        "name" to i.name,
+        "description" to i.description,
+        "minecraft" to i.minecraft,
+        "modpack" to "${i.modpack.name} ${i.modpack.version}".trim(),
+        "builtin" to i.builtin,
+        "legacySupport" to Files.isRegularFile(paths.resources.resolve("mods").resolve(i.legacyMod)),
+        "installed" to runCatching { launcher.readyOffline(i) }.getOrDefault(false),
+    )
 
     private fun progress(stage: Int = -1) = Progress { fraction, message ->
         host.emit("launch.progress", mapOf("fraction" to fraction, "message" to message, "step" to stage))
@@ -249,10 +284,12 @@ class Bridge(private val launcher: Launcher, private val host: Host) {
 
     private fun exportPack(name: String): Any? {
         val source = packs.resolve(name) ?: throw LauncherException("That resource pack is no longer installed.")
-        val target = host.chooseFiles("Export as a 1.20.1 pack", true, false, "${name.removeSuffix(".zip")} (1.20.1).zip", null, false).firstOrNull()
+        val current = instance
+        val format = current.packFormat ?: throw LauncherException("Packs cannot be converted for Minecraft ${current.minecraft}.")
+        val target = host.chooseFiles("Export as a ${current.minecraft} pack", true, false, "${name.removeSuffix(".zip")} (${current.minecraft}).zip", null, false).firstOrNull()
             ?: return null
         val rules = paths.root.resolve("wizard-states.json").takeIf(Files::isRegularFile)?.let(Files::readString)
-        PackExporter.export(source, target, listOfNotNull(rules), null)
+        PackExporter.export(source, target, listOfNotNull(rules), null, format)
         return mapOf("path" to target.toString())
     }
 

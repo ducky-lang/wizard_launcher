@@ -329,6 +329,22 @@ pre.report { max-height: 320px; overflow: auto; padding: 14px; border-radius: 10
 
 .popover { position: absolute; width: 300px; padding: 8px; border-radius: 12px; background: #17171d; border: 1px solid rgba(255, 255, 255, .09); box-shadow: 0 20px 50px rgba(0, 0, 0, .5); pointer-events: auto; animation: popIn .26s var(--ease-out); transform-origin: bottom left; }
 .popover.closing { animation: popOut .12s ease forwards; }
+.popover.wide { width: 380px; }
+.popover.down { transform-origin: top left; }
+.pop-head { padding: 4px 8px 8px; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; }
+.acct.inst .inst-ic { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px; background: rgba(255, 255, 255, .05); color: var(--text-3); }
+.acct.inst.sel .inst-ic { background: rgba(216, 178, 92, .14); color: var(--gold-2); }
+.acct.inst .inst-ic svg { width: 17px; height: 17px; }
+.acct.inst .tag { flex: none; }
+.inst-pick { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px 0 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(10, 10, 14, .35); color: var(--text); cursor: pointer; text-align: left; backdrop-filter: blur(6px); transition: border-color .15s, background .15s, transform .2s; }
+.inst-pick:hover { border-color: rgba(216, 178, 92, .45); background: rgba(216, 178, 92, .06); }
+.inst-pick[disabled] { opacity: .5; pointer-events: none; }
+.inst-pick .ib { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: rgba(216, 178, 92, .12); color: var(--gold-2); }
+.inst-pick .ib svg { width: 17px; height: 17px; }
+.inst-pick .it { display: flex; flex-direction: column; min-width: 0; max-width: 220px; }
+.inst-pick .it b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inst-pick .it small { font-size: 11px; color: var(--text-3); }
+.inst-pick > svg { width: 16px; height: 16px; color: var(--text-3); }
 @keyframes popIn { from { opacity: 0; transform: translateY(10px) scale(.96); } }
 @keyframes popOut { to { opacity: 0; transform: translateY(4px); } }
 .acct { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; transition: background .15s; }

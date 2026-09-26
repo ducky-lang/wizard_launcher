@@ -30,7 +30,10 @@ object JvmFlags {
         "-Djava.awt.headless=true",
     ) + HARDENING
 
-    fun client(heapMb: Int): List<String> = listOf(
+    fun client(heapMb: Int, javaMajor: Int = 17, sharedArchive: java.nio.file.Path? = null): List<String> = clientBase(heapMb) +
+        (if (javaMajor >= 19 && sharedArchive != null) listOf("-XX:+AutoCreateSharedArchive", "-XX:SharedArchiveFile=$sharedArchive") else emptyList())
+
+    private fun clientBase(heapMb: Int): List<String> = listOf(
         "-Xms${minOf(heapMb, 1024)}M",
         "-Xmx${heapMb}M",
         "-XX:+UseG1GC",

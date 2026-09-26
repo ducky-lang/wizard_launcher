@@ -5,13 +5,13 @@
 # Wizard Launcher
 
 **The one-click portal to _Witchcraft & Wizardry_.**<br>
-A hand-built 1.16.5 castle, played on a modern 1.20.1 client, from a launcher that feels like a product rather than a script.
+A hand-built 1.16.5 castle, played on a modern 1.20.1 or 1.21.1 client, from a launcher that feels like a product rather than a script.
 
 [![Build](https://github.com/ducky-lang/wizard_launcher/actions/workflows/build.yml/badge.svg)](https://github.com/ducky-lang/wizard_launcher/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/ducky-lang/wizard_launcher?color=f2c14e&label=release)](https://github.com/ducky-lang/wizard_launcher/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20·%20macOS%20·%20Linux-8b7ae8)
-![Java](https://img.shields.io/badge/runtime-Java%2017%20bundled-5ee1c1)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20client%20·%201.16.5%20world-7de3b0)
+![Java](https://img.shields.io/badge/runtime-Java%2017%20bundled%20·%20Java%2021%20on%20demand-5ee1c1)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1%20·%201.21.1%20client%20·%201.16.5%20world-7de3b0)
 
 [**Download**](https://github.com/ducky-lang/wizard_launcher/releases/latest) ·
 [Features](#features) ·
@@ -43,7 +43,7 @@ The 1.16.5 world server and the ViaProxy version bridge share **one JVM**. With 
 <td width="33%" valign="top">
 
 ### Old packs, read natively
-A bundled Fabric mod teaches Minecraft 1.20.1 to **read 1.13–1.19 resource packs directly**. There is no conversion step and no copy of the pack, and the original files are never modified.
+A bundled Fabric mod teaches Minecraft 1.20.1 and 1.21.1 to **read 1.13–1.19 resource packs directly**. There is no conversion step and no copy of the pack, and the original files are never modified.
 
 </td>
 </tr>
@@ -67,6 +67,8 @@ A fast, polished UI rendered by an embedded Chromium engine (JCEF). Motion is li
 <td valign="top">
 
 ### Everything in one place
+- **1.20.1 and 1.21.1 side by side**, each with its own mods, settings and screenshots.
+- **Modrinth modpacks** (`.mrpack`) imported as new installations.
 - Multiple accounts.
 - Mod, resource pack and shader manager.
 - Screenshot gallery.
@@ -84,9 +86,10 @@ A fast, polished UI rendered by an embedded Chromium engine (JCEF). Motion is li
 
 | Area | What you get |
 |---|---|
+| **Installations** | *Castle · 1.20.1* (Fabulously Optimized 5) and *Castle · 1.21.1* (Fabulously Optimized 6, Sodium 0.6, Java 21) live in separate folders and are picked beside the Play button. Game libraries and assets are shared, so the second version costs only what differs. Import a Fabric modpack from Modrinth (`.mrpack`) and it becomes one more installation that joins the same castle; packs for Forge, NeoForge, Quilt or CurseForge are refused with a clear message, and every modpack file must come from Modrinth, GitHub or GitLab with a SHA-512. A new installation starts with the controls and video settings of the one you played last. |
 | **Play** | One button installs, repairs and launches. It shows staged progress (castle → game files → mods → portal → launch) with live speed. The world boots while Minecraft loads, and Minecraft waits on an *Opening the castle gates…* screen, then joins by itself as soon as the world is ready. The world saves and stops by itself when Minecraft exits, even if the launcher was closed. |
 | **Accounts** | Microsoft sign-in with a device code, so your password is only typed on Microsoft's site. Offline players are also supported, and you can switch between several accounts with one click. Signed-in players keep playing when offline, using their saved profile. |
-| **Library** | Mods: enable, disable, add and remove, with modpack mods protected. Resource packs: enable, disable, add and remove, with 1.16.5 packs badged as *read natively* and an optional export to a 1.20.1 zip. Shader packs: add and remove. |
+| **Library** | Mods: enable, disable, add and remove, with modpack mods protected. Resource packs: enable, disable, add and remove, with 1.16.5 packs badged as *read natively* and an optional export to a zip for the selected version. Shader packs: add and remove. |
 | **Screenshots** | A gallery with thumbnails cached on disk, a lightbox with keyboard navigation, and open and delete actions. |
 | **World** | Size and last-played information, one-click backups, restore from any backup, and a reset that always backs up first. A **world self-test** boots the server, pings it as a 1.20.1 client, reports memory, then stops it and saves. |
 | **Console** | Live, filterable output from the launcher, world server and bridge, with copy and open-folder actions. |
@@ -104,10 +107,10 @@ flowchart LR
     subgraph Launcher["Wizard Launcher (Java 17, bundled)"]
         UI["Chromium UI<br/>(JCEF, offline origin)"] -- "JSON bridge" --> Core["launcher-core<br/>install · accounts · processes"]
     end
-    Core -- "stdin (no token on the command line)" --> Boot["client-boot"] --> MC["Minecraft 1.20.1<br/>Fabric + Fabulously Optimized<br/>+ Wizard Legacy Packs"]
+    Core -- "stdin (no token on the command line)" --> Boot["client-boot"] --> MC["Minecraft 1.20.1 or 1.21.1<br/>Fabric + Fabulously Optimized<br/>+ Wizard Legacy Packs"]
     Core -- "stop / watch PID" --> Host
     subgraph Host["One JVM: server-host"]
-        Via["ViaProxy<br/>1.20.1 ⇄ 1.16.5"] --> Server["Vanilla 1.16.5 server<br/>(isolated class loader)"]
+        Via["ViaProxy<br/>1.20.1 / 1.21.1 ⇄ 1.16.5"] --> Server["Vanilla 1.16.5 server<br/>(isolated class loader)"]
     end
     MC -- "127.0.0.1" --> Via
 ```
@@ -119,15 +122,22 @@ flowchart LR
 | `server-host` | Java | Runs the 1.16.5 server and ViaProxy side by side in one JVM, and saves on exit |
 | `client-boot` | Java | Receives the game arguments over stdin and starts Minecraft |
 | `pack-legacy` | Java | The translation engine for older resource packs, shared by the mod and the export tool |
-| `legacy-mod` | Java (Fabric) | Serves older packs to 1.20.1 through a translating resource layer, and holds the one-click join until the world is ready |
+| `legacy-mod` | Java (Fabric) | Serves older packs to 1.20.1 and 1.21.1 through a translating resource layer, and holds the one-click join until the world is ready. One source tree builds a jar per version |
 
-The installer carries its own Java 17 runtime. That single runtime runs the launcher, the client and the world server, so there is no Java to download, find or configure.
+The installer carries its own Java 17 runtime, which runs the launcher, the world server and the 1.20.1 client. Minecraft 1.21.1 needs Java 21: the first time you play it, the launcher fetches Mojang's own Java 21 runtime (verified file by file against Mojang's manifest) into the data folder, once. A Java set in Settings is used instead when it is new enough.
+
+### Speed
+
+- The castle and its resource pack download **alongside** Minecraft, Fabric, the modpack and Java instead of before them, and the modpack's mods download in parallel.
+- The resource pack is installed as its zip, hard-linked from the download cache, so thousands of files are never unpacked or copied.
+- Game libraries and assets are shared between installations.
+- On Java 21 the client keeps an automatic class-data-sharing archive, so later starts load the game's classes faster.
 
 ---
 
 ## Native legacy resource packs
 
-The castle's resource pack was made for **1.16.5** (`pack_format` 6). Instead of converting it, the bundled **Wizard Legacy Packs** mod reads it directly. When Minecraft opens the selected packs, each older pack is wrapped in a layer that answers the game's resource requests the way a 1.20.1 pack would. The files on disk stay exactly as they are.
+The castle's resource pack was made for **1.16.5** (`pack_format` 6). Instead of converting it, the bundled **Wizard Legacy Packs** mod reads it directly. When Minecraft opens the selected packs, each older pack is wrapped in a layer that answers the game's resource requests the way a 1.20.1 (or 1.21.1) pack would. The files on disk stay exactly as they are.
 
 | What 1.20.1 changed | How the pack is read |
 |---|---|
@@ -140,6 +150,8 @@ The castle's resource pack was made for **1.16.5** (`pack_format` 6). Instead of
 | Door and chest sounds switched to new files; `item.sweet_berries.pick_from_bush` was renamed | Events play the pack's replaced 1.16.5 files again, and renamed events are moved |
 | 1.20 dropped the unicode pages from the default font | Private use glyphs drawn on `unicode_page_e0`–`f8` keep showing, with widths measured from the pixels when `glyph_sizes.bin` is missing |
 | Player skins moved to `entity/player/wide` and `slim` in 1.19.3 | `steve.png` and `alex.png` are served from the new folders |
+| 1.20.2 split the GUI sheets (`widgets.png`, `icons.png`, containers…) into single sprites with nine-slice scaling | On 1.21.1, 381 sprites are cut from the pack's old sheets at the pack's own resolution, with the nine-slice data vanilla uses |
+| 1.20.3 renamed `grass` to `short_grass`; 1.20.5 renamed `scute` to `turtle_scute` | On 1.21.1, the pack's models, textures and names are served under the new ids |
 | Older `pack_format` is flagged *incompatible* | The pack is listed as compatible |
 
 Any pack from **1.13 to 1.19.4** benefits, with rules gated by the version each change arrived in. A report for every pack is written to `logs/wizard-legacy-packs/`.
@@ -197,9 +209,10 @@ Packs, or you, can declare extra rules in `wizard-states.json`. Put it in the pa
 
 ## Offline play
 
-- The first launch downloads the castle, Minecraft 1.20.1, Fabric and the modpack once. After that, **Play works with the network cable unplugged**.
+- The first launch of each version downloads the castle, Minecraft, Fabric, the modpack (and Java 21 for 1.21.1) once. After that, **Play works with the network cable unplugged**.
 - **Settings → Offline mode** forbids all network access.
-- **Export offline bundle** packs the game, libraries, assets, mods and cached content into one `.wizardpack`. **Import offline bundle** installs it on another computer. Bundles are verified file by file, and a damaged or tampered bundle changes nothing.
+- The castle and its resource pack are checked against the fingerprints Hugging Face publishes. A changed file is downloaded again; if the server is unreachable the copy already on the computer is used, and a file missing from the server is reported by name.
+- **Export offline bundle** packs every installation, the shared libraries and assets, the Java runtimes, mods and cached content into one `.wizardpack`. **Import offline bundle** installs it on another computer. Bundles are verified file by file, and a damaged or tampered bundle changes nothing.
 - A Microsoft account keeps working offline with its saved profile, because the local world server does not check tokens.
 
 ---
@@ -228,11 +241,13 @@ Your world, settings and logs live in the data folder, and uninstalling never de
 ```text
 WizardLauncher                                   open the launcher
 WizardLauncher --classic                         open the lightweight Swing interface
-WizardLauncher --play [--name <player>]          install if needed and play, no window
-WizardLauncher --verify-install                  install or repair the game and check every file
+WizardLauncher --play [--name <player>] [--instance <id>]   install if needed and play, no window
+WizardLauncher --list-instances                  list the installations (* marks the selected one)
+WizardLauncher --import-modpack <file.mrpack>    add a Fabric modpack from Modrinth as an installation
+WizardLauncher --verify-install [--instance <id>]    install or repair a version and check every file
 WizardLauncher --world-selftest                  start the world and bridge, ping as 1.20.1, stop
-WizardLauncher --smoke-client [--pack p.zip]     start Minecraft briefly and check it loads
-WizardLauncher --export-pack <in> <out.zip>      write a 1.20.1-format copy of an older pack
+WizardLauncher --smoke-client [--instance <id>] [--pack p.zip]   start Minecraft briefly and check it loads
+WizardLauncher --export-pack <in> <out.zip> [--target 1.20.1|1.21.1]   write a modern copy of an older pack
 WizardLauncher --export-bundle <file>            pack this install for an offline computer
 WizardLauncher --import-bundle <file>            install from an offline bundle
 WizardLauncher --catalog-keygen | --catalog-sign <catalog.json>
@@ -249,7 +264,8 @@ You need JDK 17 or newer.
 ```bash
 ./gradlew build                                   # compile and run every test
 ./gradlew fetchGameJars                           # download and verify the pinned server and bridge jars
-./gradlew -p legacy-mod build                     # build the Fabric legacy-pack mod
+./gradlew -p legacy-mod build -Pmc=1.20.1         # build the Fabric legacy-pack mod for 1.20.1
+./gradlew -p legacy-mod build -Pmc=1.21.1         # and for 1.21.1
 ./gradlew :launcher-app:run                       # run from source
 ./gradlew :launcher-app:jpackage                  # self-contained app image for this OS
 ./gradlew :launcher-app:jpackage -PjpackageType=dmg
@@ -257,9 +273,9 @@ You need JDK 17 or newer.
 
 CI (`.github/workflows/build.yml`) does the following:
 - Runs the tests.
-- Builds the mod.
-- **Installs the real game on Windows, macOS and Linux**.
-- Starts Minecraft 1.20.1 with a generated 1.16.5 pack under a virtual display.
+- Builds the mod for 1.20.1 and 1.21.1.
+- **Installs both versions of the real game on Windows, macOS and Linux**, including Java 21.
+- Starts Minecraft 1.20.1 and 1.21.1 with a generated 1.16.5 pack under a virtual display.
 - Builds installers for all three platforms, with SHA-256 checksums.
 
 Running the workflow manually, or pushing a `v*.*.*` tag, publishes a release.
@@ -275,6 +291,7 @@ Microsoft sign-in needs a public Azure application id, passed as the `MC_LAUNCHE
 - **Built on:**
   - [Fabric](https://fabricmc.net/)
   - [Fabulously Optimized](https://modrinth.com/modpack/fabulously-optimized)
+  - [XZ for Java](https://tukaani.org/xz/java.html)
   - [ViaProxy](https://github.com/ViaVersion/ViaProxy)
   - [JCEF](https://github.com/chromiumembedded/java-cef) via [jcefmaven](https://github.com/jcefmaven/jcefmaven)
   - [FlatLaf](https://www.formdev.com/flatlaf/)

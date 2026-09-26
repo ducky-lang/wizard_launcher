@@ -38,6 +38,11 @@ class ClientRunnerTest {
         assertTrue(cp.all { Path.of(it).isAbsolute })
         assertFalse(plan.command.any { it.contains("Harry") && it.contains("accessToken") })
         assertTrue("--quickPlayMultiplayer" !in plan.command)
+        assertTrue(plan.command.none { it.startsWith("-XX:SharedArchiveFile") })
+        val modern = ClientRunner(paths, settings, ProcessSupervisor(tmp.resolve("state.json")), Path.of("java"), boot, paths.gameDir("1.21.1"), 21)
+            .plan(profile, Account.offline("Harry"), "127.0.0.1:25566")
+        assertTrue("-XX:+AutoCreateSharedArchive" in modern.command)
+        assertTrue(modern.command.any { it.startsWith("-XX:SharedArchiveFile=") && it.contains("1.21.1") })
         assertFalse("-Dwizard.waitForWorld=true" in plan.command)
 
         val waiting = ClientRunner(paths, settings, ProcessSupervisor(tmp.resolve("state.json")), Path.of("java"), boot)

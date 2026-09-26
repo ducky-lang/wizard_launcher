@@ -3,6 +3,7 @@ plugins { kotlin("jvm") }
 dependencies {
     api("com.google.code.gson:gson:2.11.0")
     implementation("net.java.dev.jna:jna-platform:5.15.0")
+    implementation("org.tukaani:xz:1.10")
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

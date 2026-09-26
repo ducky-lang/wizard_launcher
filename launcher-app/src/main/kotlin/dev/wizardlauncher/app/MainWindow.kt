@@ -8,6 +8,7 @@ import dev.wizardlauncher.core.Settings
 import dev.wizardlauncher.core.auth.Account
 import dev.wizardlauncher.core.install.OfflineBundle
 import dev.wizardlauncher.core.install.Progress
+import dev.wizardlauncher.legacy.LegacyTranslator
 import dev.wizardlauncher.legacy.PackExporter
 import java.awt.BorderLayout
 import java.awt.Cursor
@@ -29,6 +30,7 @@ import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.ImageIcon
 import javax.swing.JButton
+import javax.swing.JComboBox
 import javax.swing.JComponent
 import javax.swing.JFileChooser
 import javax.swing.JFrame
@@ -60,6 +62,8 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         putClientProperty("JButton.buttonType", "roundRect")
     }
     private val stop = JButton("Stop").apply { isEnabled = false }
+    private val instancePicker = JComboBox<String>().apply { preferredSize = Dimension(240, 36) }
+    private var instanceIds = emptyList<String>()
     private val logArea = JTextArea(8, 60).apply {
         isEditable = false; lineWrap = true; wrapStyleWord = true
         foreground = Theme.textSub; font = Font(Font.MONOSPACED, Font.PLAIN, 12)
@@ -96,13 +100,48 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         offlineButton.addActionListener { askOfflineName() }
         signOut.addActionListener { launcher.accounts.signOut(); refreshAccount() }
         addWindowListener(object : WindowAdapter() { override fun windowClosing(e: WindowEvent) = onClose() })
+        instancePicker.addActionListener { onInstancePicked() }
         refreshAccount()
+        refreshInstances()
+    }
+
+    private fun refreshInstances() {
+        val all = launcher.instances.all()
+        val selected = launcher.instances.selected().id
+        instanceIds = all.map { it.id }
+        instancePicker.removeAllItems()
+        all.forEach { instancePicker.addItem("${it.name}  ·  Minecraft ${it.minecraft}") }
+        instancePicker.selectedIndex = instanceIds.indexOf(selected).coerceAtLeast(0)
+        checkReady()
+    }
+
+    private fun onInstancePicked() {
+        val id = instanceIds.getOrNull(instancePicker.selectedIndex) ?: return
+        if (id == launcher.instances.selected().id) return
+        if (busy || launcher.supervisor.anyRunning()) {
+            refreshInstances()
+            return
+        }
+        launcher.instances.select(id)
+        checkReady()
+    }
+
+    private fun checkReady() {
         thread(isDaemon = true, name = "startup-check") {
-            val ready = launcher.readyOffline()
+            val ready = runCatching { launcher.readyOffline() }.getOrDefault(false)
             SwingUtilities.invokeLater {
                 status.text = if (ready) "Installed - plays with or without internet." else
                     "First launch downloads the castle, the game and the mods (about ${dev.wizardlauncher.core.Catalog.current.approxDownloadMb / 1000 + 1} GB)."
             }
+        }
+    }
+
+    private fun importModpack() {
+        val file = choose("Choose a Modrinth modpack (.mrpack)", open = true, filter = FileNameExtensionFilter("Modrinth modpack", "mrpack")) ?: return
+        background("Importing modpack...") {
+            val added = launcher.instances.importModpack(file)
+            launcher.instances.select(added.id)
+            ui { refreshInstances() }
         }
     }
 
@@ -125,7 +164,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             border = BorderFactory.createEmptyBorder(4, 14, 0, 0)
             add(JLabel("Witchcraft & Wizardry").apply { font = Theme.title(30f); foreground = Theme.gold })
-            add(JLabel("A castle, rebuilt block by block  ·  1.16.5 world on a 1.20.1 client").apply { foreground = Theme.textSub })
+            add(JLabel("A castle, rebuilt block by block  ·  1.16.5 world on a 1.20.1 or 1.21.1 client").apply { foreground = Theme.textSub })
         }, BorderLayout.CENTER)
         add(JPanel().apply {
             isOpaque = false
@@ -140,7 +179,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         isOpaque = false
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         add(Box.createVerticalGlue())
-        add(JPanel(FlowLayout(FlowLayout.CENTER, 10, 0)).apply { isOpaque = false; add(play) })
+        add(JPanel(FlowLayout(FlowLayout.CENTER, 10, 0)).apply { isOpaque = false; add(play); add(instancePicker) })
         add(Box.createVerticalStrut(14))
         add(JPanel(FlowLayout(FlowLayout.CENTER, 8, 0)).apply { isOpaque = false; add(stop); add(signIn); add(offlineButton); add(signOut) })
         add(Box.createVerticalStrut(18))
@@ -163,11 +202,12 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
             item("Back up the world now") { background("Backing up...") { launcher.backupWorld()?.let { Log.info("World backed up to $it") } } }
             item("Reset the world (keeps a backup)...") { resetWorld() }
             addSeparator()
+            item("Import a modpack (.mrpack)...") { importModpack() }
             item("Open game folder") { open(launcher.paths.gameDir) }
             item("Open world backups") { open(launcher.paths.backups) }
         })
         add(JMenu("Tools").apply {
-            item("Convert a 1.16.5 resource pack for 1.20.1...") { convertPack() }
+            item("Convert a 1.16.5 resource pack for this version...") { convertPack() }
             item("Edit block state rules (wizard-states.json)...") { editStateRules() }
             addSeparator()
             item("Export offline bundle...") { exportBundle() }
@@ -189,7 +229,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
                     "Wizard Launcher ${BuildInfo.version}\n\n" +
                         "Map: Witchcraft and Wizardry by The Floo Network.\n" +
                         "World: Minecraft 1.16.5, bridged by ViaProxy (same JVM).\n" +
-                        "Client: Minecraft 1.20.1 + Fabulously Optimized.\n\n" +
+                        "Client: Minecraft 1.20.1 or 1.21.1 + Fabulously Optimized.\n\n" +
                         "Data folder:\n${launcher.paths.root}", "About", JOptionPane.INFORMATION_MESSAGE)
             }
         })
@@ -227,6 +267,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
         if (busy) return
         busy = true
         play.isEnabled = false
+        instancePicker.isEnabled = false
         stop.isEnabled = true
         progress.isVisible = true
         status.text = "Checking your account..."
@@ -239,7 +280,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
             }
             if (account == null) {
                 busy = false
-                ui { play.isEnabled = true; stop.isEnabled = false; progress.isVisible = false; status.text = "Ready when you are." }
+                ui { play.isEnabled = true; instancePicker.isEnabled = true; stop.isEnabled = false; progress.isVisible = false; status.text = "Ready when you are." }
                 return@thread
             }
             try {
@@ -260,7 +301,7 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
                 ui { JOptionPane.showMessageDialog(this, "Something went wrong: ${e.message}\n\nDetails are in the log folder.", "Error", JOptionPane.ERROR_MESSAGE) }
             } finally {
                 busy = false
-                ui { play.isEnabled = true; stop.isEnabled = false; progress.isVisible = false; status.text = "Ready when you are." }
+                ui { play.isEnabled = true; instancePicker.isEnabled = true; stop.isEnabled = false; progress.isVisible = false; status.text = "Ready when you are." }
             }
         }
     }
@@ -291,10 +332,13 @@ class MainWindow(private val launcher: Launcher) : JFrame("Wizard Launcher") {
 
     private fun convertPack() {
         val input = choose("Choose a 1.16.5 resource pack (.zip or folder)", open = true, dirs = true) ?: return
-        val output = choose("Save the 1.20.1 pack as", open = false, suggested = input.fileName.toString().removeSuffix(".zip") + " (1.20.1).zip") ?: return
+        val instance = launcher.instances.selected()
+        val format = instance.packFormat ?: LegacyTranslator.TARGET_FORMAT
+        val mc = if (instance.packFormat != null) instance.minecraft else "1.20.1"
+        val output = choose("Save the $mc pack as", open = false, suggested = input.fileName.toString().removeSuffix(".zip") + " ($mc).zip") ?: return
         background("Converting resource pack...") {
             val rules = launcher.paths.root.resolve("wizard-states.json").takeIf { java.nio.file.Files.isRegularFile(it) }
-            val overlay = PackExporter.export(input, output, listOfNotNull(rules?.let { java.nio.file.Files.readString(it) }), null)
+            val overlay = PackExporter.export(input, output, listOfNotNull(rules?.let { java.nio.file.Files.readString(it) }), null, format)
             Log.info("Exported -> $output (${overlay.files().size} files adapted, ${overlay.warnings().size} note(s)).")
             ui { ReportDialog(this, overlay.report()).isVisible = true }
         }

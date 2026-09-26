@@ -55,13 +55,15 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { pattern: legacy-mod-*, path: legacy-mod/build/libs, merge-multiple: true }
       - run: ./gradlew fetchGameJars :launcher-app:installDist --no-daemon
-      - name: Install and verify the game
+      - name: Install and verify both game versions
         shell: bash
         run: |
           BIN=launcher-app/build/install/WizardLauncher/bin/WizardLauncher
           if [ "$RUNNER_OS" = "Windows" ]; then BIN="$BIN.bat"; fi
-          "$BIN" --verify-install
-      - name: Start Minecraft with a 1.16.5 pack
+          "$BIN" --list-instances
+          "$BIN" --verify-install --instance 1.20.1
+          "$BIN" --verify-install --instance 1.21.1
+      - name: Start Minecraft 1.20.1 and 1.21.1 with a 1.16.5 pack
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
@@ -84,12 +86,16 @@ jobs:
               "assets/minecraft/models/block/vine_1.json": json.dumps({"parent": "block/block", "ambientocclusion": False, "textures": {"particle": "block/vine", "vine": "block/vine"}, "elements": [{"from": [0, 0, 15.2], "to": [16, 16, 15.2], "shade": False, "faces": {"north": {"uv": [16, 0, 0, 16], "texture": "#vine", "tintindex": 0}, "south": {"uv": [0, 0, 16, 16], "texture": "#vine", "tintindex": 0}}}]}),
               "assets/minecraft/models/block/soul_fire_floor0.json": json.dumps({"parent": "block/fire_floor", "textures": {"particle": "block/soul_fire_0", "fire": "block/soul_fire_0"}}),
               "assets/minecraft/sounds/block/wooden_door/open.ogg": b"OggS",
+              "assets/minecraft/textures/gui/widgets.png": png(256, 256, (90, 90, 160, 255)),
+              "assets/minecraft/textures/block/grass.png": png(16, 16, (60, 160, 60, 255)),
           }
           with zipfile.ZipFile("legacy-test-pack.zip", "w") as z:
               for n, d in files.items():
                   z.writestr(n, d if isinstance(d, bytes) else d.encode())
           PY
-          xvfb-run -a -s "-screen 0 1280x720x24" launcher-app/build/install/WizardLauncher/bin/WizardLauncher --smoke-client --pack legacy-test-pack.zip --timeout 420
+          for mc in 1.20.1 1.21.1; do
+            xvfb-run -a -s "-screen 0 1280x720x24" launcher-app/build/install/WizardLauncher/bin/WizardLauncher --smoke-client --instance "$mc" --pack legacy-test-pack.zip --timeout 420
+          done
       - name: Collect logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -97,7 +103,7 @@ jobs:
           name: e2e-logs-${{ matrix.os }}
           path: |
             e2e-data/logs
-            e2e-data/resources/client/1.20.1/minecraft/logs
+            e2e-data/resources/client/*/minecraft/logs
           if-no-files-found: ignore
 
   installers:

@@ -66,6 +66,58 @@
       }
     ]
   },
+  "instances": [
+    {
+      "id": "1.20.1",
+      "name": "Castle · 1.20.1",
+      "description": "The classic client the castle was tuned on.",
+      "minecraft": "1.20.1",
+      "fabric_loader_fallback": "0.15.11",
+      "required_java_major": 17,
+      "pack_format": 15,
+      "modpack": {
+        "id": "fabulously-optimized",
+        "name": "Fabulously Optimized",
+        "version": "5.4.1",
+        "url": "https://cdn.modrinth.com/data/1KVo5zza/versions/2ZbcYfCj/Fabulously.Optimized-5.4.1.mrpack",
+        "sha512": "af4b2043f00bcceefdbe1c0ec3ea3cc4d385052d963a9778164b702c3a5dad6e60aa30a1d293ab03b5b780fe1fce75dc846ee3d40a7d1c01bddf74dd76174e62",
+        "approx_mb": 120,
+        "extra_mods": [
+          {
+            "name": "CustomSkinLoader",
+            "path": "mods/CustomSkinLoader_Universal-15.0.1.jar",
+            "url": "https://cdn.modrinth.com/data/idMHQ4n2/versions/OLaesh5y/CustomSkinLoader_Universal-15.0.1.jar",
+            "sha512": "8c65193c46c1435ddea571901f1dd04cc179179f59f1c1a0449349de04722b9c1b6e5efaec166975e05d2fa0b05f6c07c9d5d93a05f1c9a57fece2a0d0fc1ce7"
+          }
+        ]
+      }
+    },
+    {
+      "id": "1.21.1",
+      "name": "Castle · 1.21.1",
+      "description": "A newer client with Sodium 0.6 and Java 21.",
+      "minecraft": "1.21.1",
+      "fabric_loader_fallback": "0.19.3",
+      "required_java_major": 21,
+      "pack_format": 34,
+      "modpack": {
+        "id": "fabulously-optimized",
+        "name": "Fabulously Optimized",
+        "version": "6.5.0",
+        "url": "https://cdn.modrinth.com/data/1KVo5zza/versions/N276l2ON/Fabulously.Optimized-v6.5.0.mrpack",
+        "sha512": "56d67f427207f561e21eaf53e98e4af1429327f3fa1215361e9bfad73e19fa905687c7692de2a1174d66e3bff4ffd7c7d3fbd8fe88de5d3fb50ba79f673e0f00",
+        "approx_mb": 140,
+        "extra_mods": [
+          {
+            "name": "CustomSkinLoader",
+            "path": "mods/CustomSkinLoader_Universal-15.0.1.jar",
+            "url": "https://cdn.modrinth.com/data/idMHQ4n2/versions/OLaesh5y/CustomSkinLoader_Universal-15.0.1.jar",
+            "sha512": "8c65193c46c1435ddea571901f1dd04cc179179f59f1c1a0449349de04722b9c1b6e5efaec166975e05d2fa0b05f6c07c9d5d93a05f1c9a57fece2a0d0fc1ce7"
+          }
+        ]
+      }
+    }
+  ],
   "resources": [
     {
       "id": "map",

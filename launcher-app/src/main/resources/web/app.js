@@ -215,6 +215,7 @@
             </div>
             <div class="play-row">
               <button class="play" id="playBtn" type="button"><span class="pi">${ICONS.play}</span><span class="pl"></span></button>
+              <button class="inst-pick" id="instBtn" type="button" title="${t("inst.title")}"><span class="ib">${ICONS.cube}</span><span class="it"><b></b><small></small></span>${ICONS.chevron}</button>
               <button class="ghost danger" id="stopBtn" type="button" hidden>${ICONS.stop}${t("play.stop")}</button>
             </div>
             <p class="muted" id="playHint" style="margin:12px 0 0"></p>
@@ -230,6 +231,7 @@
       bindHeroArt();
       $("#playBtn").addEventListener("click", onPlay);
       $("#stopBtn").addEventListener("click", () => call("game.stop"));
+      $("#instBtn").addEventListener("click", openInstanceMenu);
       rendered.home = true;
     }
     updatePlay();
@@ -268,8 +270,8 @@
       </div>
       <div class="card hover">
         <h3>${ICONS.palette}${t("card.legacy")}</h3>
-        <p class="muted" style="margin:0 0 14px">${t("legacy.body")}</p>
-        <span class="tag ${info.legacySupport ? "ok" : "warn"}">${info.legacySupport ? t("legacy.active") : t("legacy.missing")}</span>
+        <p class="muted" style="margin:0 0 14px">${t("legacy.body", { v: esc(info.clientVersion || "1.20.1") })}</p>
+        <span class="tag ${info.legacySupport ? "ok" : "warn"}">${info.legacySupport ? t("legacy.active") : (info.instance && !info.instance.builtin ? t("inst.noLegacy") : t("legacy.missing"))}</span>
       </div>
       <div class="card hover news" style="grid-column: 1 / -1">
         <h3>${ICONS.sparkle}${t("card.news")} · ${esc(info.version || "")}</h3>
@@ -301,6 +303,7 @@
       FX.restart($(".pi", btn), "swap");
     }
     $("#stopBtn").hidden = !(g.state === "playing" || busy);
+    renderInstButton();
     const launch = $("#launch");
     launch.classList.toggle("show", busy);
     if (busy) {
@@ -313,6 +316,69 @@
     }
     const info = state.info || {};
     $("#playHint").textContent = g.state === "idle" ? (info.offlineReady ? t("play.hint.ready") : t("play.hint.first", { gb: info.downloadGb || 3 })) : "";
+  }
+
+  function renderInstButton() {
+    const btn = $("#instBtn");
+    if (!btn) return;
+    const inst = (state.info || {}).instance;
+    const info = state.info || {};
+    $(".it b", btn).textContent = inst ? inst.name : "Minecraft " + (info.clientVersion || "");
+    $(".it small", btn).textContent = inst ? "Minecraft " + inst.minecraft : "";
+    btn.disabled = state.game.state !== "idle" && state.game.state !== "error";
+  }
+
+  async function openInstanceMenu() {
+    const root = $("#popoverRoot");
+    if ($(".popover", root)) { closePopover(); return; }
+    const btn = $("#instBtn");
+    const r = await call("instances.list").catch(() => null);
+    if (!r || !btn) return;
+    const box = btn.getBoundingClientRect();
+    root.style.pointerEvents = "auto";
+    root.innerHTML = `<div class="popover wide down" style="left:${Math.max(12, Math.min(box.left, window.innerWidth - 392))}px;top:${box.bottom + 10}px">
+      <div class="muted pop-head">${t("inst.title")}</div>
+      ${r.instances.map((i) => `<div class="acct inst ${i.id === r.selected ? "sel" : ""}" data-id="${esc(i.id)}">
+        <div class="inst-ic">${i.builtin ? ICONS.castle : ICONS.cube}</div>
+        <div class="who"><b>${esc(i.name)}</b><span>Minecraft ${esc(i.minecraft)}${i.modpack ? " · " + esc(i.modpack) : ""}</span></div>
+        <span class="tag ${i.installed ? "ok" : ""}">${i.installed ? t("inst.installed") : i.builtin ? t("inst.notInstalled") : t("inst.imported.tag")}</span>
+        ${i.builtin ? "" : `<button class="iconbtn danger" data-rm="${esc(i.id)}" data-name="${esc(i.name)}" title="${t("inst.remove")}">${ICONS.trash}</button>`}
+      </div>`).join("")}
+      <div class="pop-sep"></div>
+      <button class="pop-item" data-act="import">${ICONS.download}${t("inst.import")}</button>
+      <button class="pop-item" data-act="folder">${ICONS.folder}${t("inst.folder")}</button>
+    </div>`;
+    root.addEventListener("click", (e) => { if (e.target === root) closePopover(); }, { once: true });
+    $$(".acct.inst", root).forEach((row) => row.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-rm]")) return;
+      closePopover();
+      if (row.classList.contains("sel")) return;
+      await call("instances.select", { id: row.dataset.id });
+      await instanceChanged();
+      toast("ok", t("inst.switched", { name: (state.info.instance || {}).name || row.dataset.id }));
+    }));
+    $$("[data-rm]", root).forEach((b) => b.addEventListener("click", async () => {
+      closePopover();
+      if (!(await confirmBox(t("inst.removeConfirm", { name: b.dataset.name }), t("inst.removeBody"), true))) return;
+      await call("instances.remove", { id: b.dataset.rm });
+      await instanceChanged();
+    }));
+    $$("[data-act]", root).forEach((b) => b.addEventListener("click", async () => {
+      closePopover();
+      if (b.dataset.act === "folder") { await call("instances.openFolder"); return; }
+      const added = await call("instances.import");
+      if (!added) return;
+      await instanceChanged();
+      toast("ok", t("inst.added", { name: (state.info.instance || {}).name || "" }));
+    }));
+  }
+
+  async function instanceChanged() {
+    state.info = await WL.call("app.info").catch(() => state.info);
+    Object.keys(libCache).forEach((k) => delete libCache[k]);
+    renderChips();
+    if (state.page === "home") render("home", true);
+    else rendered.home = false;
   }
 
   async function onPlay(e) {
@@ -395,7 +461,7 @@
           <div class="ic">${p.hasIcon ? `<img src="/media/packicon/${encodeURIComponent(p.name)}" alt="">` : ICONS.palette}</div>
           <div class="body"><div class="name">${esc(p.name)} ${p.legacy ? `<span class="tag ok">${t("lib.legacy")}</span>` : `<span class="tag">${t("lib.format", { f: p.format })}</span>`}</div>
           <div class="desc">${esc(p.description)}</div></div>
-          ${p.legacy ? `<button class="iconbtn" data-export="${esc(p.name)}" title="${t("lib.export")}">${ICONS.upload}</button>` : ""}
+          ${p.legacy ? `<button class="iconbtn" data-export="${esc(p.name)}" title="${t("lib.export", { v: esc((state.info || {}).clientVersion || "1.20.1") })}">${ICONS.upload}</button>` : ""}
           <button class="iconbtn danger" data-remove="${esc(p.name)}" title="${t("lib.remove")}">${ICONS.trash}</button>
           <label class="switch"><input type="checkbox" data-toggle="${esc(p.name)}" ${p.enabled ? "checked" : ""}><span></span></label>
         </div>`).join("");
@@ -607,7 +673,7 @@
             row(t("set.serverRam"), "", ram("server_ram_mb")) +
             row(t("set.resolution"), t("set.resolution.d"), `<select class="field" id="resSel">${[["0x0", t("set.res.default")], ["1280x720", "1280 × 720"], ["1600x900", "1600 × 900"], ["1920x1080", "1920 × 1080"], ["2560x1440", "2560 × 1440"]].map(([v, l]) => `<option value="${v}" ${v === res ? "selected" : ""}>${l}</option>`).join("")}</select>`) +
             row(t("set.fullscreen"), t("set.fullscreen.d"), toggle("fullscreen")) +
-            row(t("set.java"), t("set.java.d"), `<input class="field wide" id="javaPath" value="${esc(s.java_path)}" placeholder="Java 17 (bundled)">`))}
+            row(t("set.java"), t("set.java.d"), `<input class="field wide" id="javaPath" value="${esc(s.java_path)}" placeholder="${t("set.java.auto")}">`))}
           ${group("network", t("set.network"),
             row(t("set.offline"), t("set.offline.d"), toggle("offline_only")) +
             row(t("set.lan"), t("set.lan.d"), toggle("allow_lan")))}

@@ -25,13 +25,18 @@ class MinecraftInstaller(
     private val state: InstallState,
     private val downloader: SecureDownloader,
     private val progress: Progress,
+    private val mc: String = Catalog.current.minecraft.clientVersion,
 ) {
-    private val mc = Catalog.current.minecraft.clientVersion
+    private val stateKey = "minecraft@$mc"
+
+    private fun recorded(loader: String): Boolean {
+        val fingerprint = InstallState.fingerprint(mc, loader)
+        return state.matches(stateKey, fingerprint) || (mc == LEGACY_VERSION && state.matches("minecraft", fingerprint))
+    }
 
     fun fabricId(loader: String) = "fabric-loader-$loader-$mc"
 
-    fun isInstalled(loader: String): Boolean =
-        state.matches("minecraft", InstallState.fingerprint(mc, loader)) && missingFiles(loader).isEmpty()
+    fun isInstalled(loader: String): Boolean = recorded(loader) && missingFiles(loader).isEmpty()
 
     fun missingFiles(loader: String): List<Path> {
         val id = fabricId(loader)
@@ -59,7 +64,7 @@ class MinecraftInstaller(
 
     fun ensure(loader: String, verify: Boolean = false): String {
         val id = fabricId(loader)
-        val recorded = state.matches("minecraft", InstallState.fingerprint(mc, loader))
+        val recorded = recorded(loader)
         val missing = if (recorded) missingFiles(loader) else emptyList()
         if (recorded && missing.isEmpty() && !verify) return id
         if (recorded && missing.isNotEmpty()) {
@@ -97,7 +102,7 @@ class MinecraftInstaller(
             throw LauncherException("The game could not be fully installed; ${stillMissing.size} file(s) are still missing, for example:\n" +
                 stillMissing.take(3).joinToString("\n"))
         }
-        state.mark("minecraft", InstallState.fingerprint(mc, loader))
+        state.mark(stateKey, InstallState.fingerprint(mc, loader))
         Log.info("Minecraft $mc with Fabric $loader is ready.")
         return id
     }
@@ -165,7 +170,8 @@ class MinecraftInstaller(
     }
 
     private fun <T> parallel(items: List<T>, action: (T) -> Unit) {
-        val pool = Executors.newFixedThreadPool(8)
+        if (items.isEmpty()) return
+        val pool = Executors.newFixedThreadPool(THREADS.coerceAtMost(items.size))
         try {
             val futures: List<Future<*>> = items.map { pool.submit { action(it) } }
             futures.forEach {
@@ -180,6 +186,8 @@ class MinecraftInstaller(
         const val VERSION_MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
         const val FABRIC_META = "https://meta.fabricmc.net"
         const val RESOURCES = "https://resources.download.minecraft.net"
+        const val LEGACY_VERSION = "1.20.1"
+        val THREADS = (Runtime.getRuntime().availableProcessors() * 3).coerceIn(8, 24)
     }
 }
 
@@ -208,6 +216,8 @@ class VersionProfile(
     val jvmArgs: List<JsonElement>,
     val nativesDir: Path,
     val versionType: String,
+    val javaMajor: Int? = null,
+    val javaComponent: String? = null,
 ) {
     companion object {
         fun load(paths: AppPaths, fabricId: String): VersionProfile {
@@ -234,6 +244,8 @@ class VersionProfile(
                 jvmArgs = args(vanilla, "jvm") + args(fabric, "jvm"),
                 nativesDir = paths.versions.resolve(mc).resolve("natives-${Platform.arch}"),
                 versionType = vanilla.get("type")?.asString ?: "release",
+                javaMajor = vanilla.getAsJsonObject("javaVersion")?.get("majorVersion")?.asInt,
+                javaComponent = vanilla.getAsJsonObject("javaVersion")?.get("component")?.asString,
             )
         }
 

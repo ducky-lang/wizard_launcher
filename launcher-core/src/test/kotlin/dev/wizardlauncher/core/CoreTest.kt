@@ -150,7 +150,8 @@ class CoreTest {
 
         val dst = AppPaths(tmp.resolve("b")).ensure()
         OfflineBundle.import(dst, bundle)
-        assertEquals("jar", Files.readString(dst.root.resolve("resources/client/1.20.1/minecraft/libraries/x.jar")))
+        assertEquals("jar", Files.readString(dst.root.resolve("resources/client/shared/libraries/x.jar")))
+        assertFalse(Files.exists(dst.root.resolve("resources/client/1.20.1/minecraft/libraries")))
 
         val tampered = tmp.resolve("t.wizardpack")
         java.util.zip.ZipFile(bundle.toFile()).use { zin ->
@@ -177,6 +178,9 @@ class CoreTest {
         assertEquals("1.20.1", c.minecraft.clientVersion)
         assertEquals("hosted", c.server.mode)
         assertEquals(6, c.resource("resource_pack").convertFrom)
+        assertEquals(listOf("1.20.1", "1.21.1"), c.instances.map { it.minecraft })
+        assertEquals(21, c.instance("1.21.1")?.requiredJava)
+        assertTrue(c.instances.all { it.modpack.url.startsWith("https://cdn.modrinth.com/") && it.modpack.sha512.length == 128 })
     }
 
     @Test fun `model based culling is switched off so remodelled blocks cull like vanilla`() {

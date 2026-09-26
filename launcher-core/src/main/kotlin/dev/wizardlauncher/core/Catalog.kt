@@ -17,12 +17,17 @@ class Catalog private constructor(root: JsonObject) {
     data class ExtraMod(val name: String, val path: String, val url: String, val sha512: String)
     data class Modpack(val id: String, val name: String, val version: String, val url: String, val sha512: String, val approxMb: Int, val extraMods: List<ExtraMod>)
     data class Resource(val id: String, val name: String, val kind: String, val url: String, val sha256: String, val approxMb: Int, val convertFrom: Int?)
+    data class InstanceSpec(
+        val id: String, val name: String, val description: String, val minecraft: String,
+        val loaderFallback: String, val requiredJava: Int, val packFormat: Int, val modpack: Modpack,
+    )
 
     val minecraft: Minecraft
     val server: Server
     val download: Download
     val modpack: Modpack
     val resources: List<Resource>
+    val instances: List<InstanceSpec>
     val signingKey: String
 
     init {
@@ -48,24 +53,36 @@ class Catalog private constructor(root: JsonObject) {
             d.set("game_domains", setOf("mojang.com", "minecraft.net", "fabricmc.net")),
             d.set("mod_domains", setOf("modrinth.com")),
             d.int("max_retries", 4), d.int("backoff_seconds", 2) * 1000L)
-        val m = root.obj("modpack")
-        modpack = Modpack(
-            m.str("id", "fabulously-optimized"), m.str("name", "Fabulously Optimized"), m.str("version", ""),
-            m.str("url", ""), m.str("sha512", ""), m.int("approx_mb", 120),
-            (m.getAsJsonArray("extra_mods") ?: com.google.gson.JsonArray()).map { it.asJsonObject }.map {
-                ExtraMod(it.str("name", ""), it.str("path", ""), it.str("url", ""), it.str("sha512", ""))
-            })
+        modpack = modpackOf(root.obj("modpack"))
         resources = (root.getAsJsonArray("resources") ?: com.google.gson.JsonArray()).map { it.asJsonObject }.map {
             Resource(it.str("id", ""), it.str("name", ""), it.str("kind", ""), it.str("url", ""),
                 it.str("sha256", ""), it.int("approx_mb", 0), it.get("convert_from")?.asInt)
         }
+        instances = (root.getAsJsonArray("instances") ?: com.google.gson.JsonArray()).map { it.asJsonObject }.map {
+            InstanceSpec(
+                it.str("id", ""), it.str("name", ""), it.str("description", ""), it.str("minecraft", ""),
+                it.str("fabric_loader_fallback", minecraft.fabricLoaderFallback), it.int("required_java_major", 17),
+                it.int("pack_format", 15), modpackOf(it.obj("modpack")))
+        }.filter { it.id.isNotBlank() && it.minecraft.isNotBlank() }.ifEmpty {
+            listOf(InstanceSpec(minecraft.clientVersion, "Minecraft ${minecraft.clientVersion}", "", minecraft.clientVersion,
+                minecraft.fabricLoaderFallback, minecraft.requiredJava, 15, modpack))
+        }
         signingKey = root.obj("signing").str("public_key", "")
     }
+
+    private fun modpackOf(m: JsonObject) = Modpack(
+        m.str("id", "fabulously-optimized"), m.str("name", "Fabulously Optimized"), m.str("version", ""),
+        m.str("url", ""), m.str("sha512", ""), m.int("approx_mb", 120),
+        (m.getAsJsonArray("extra_mods") ?: com.google.gson.JsonArray()).map { it.asJsonObject }.map {
+            ExtraMod(it.str("name", ""), it.str("path", ""), it.str("url", ""), it.str("sha512", ""))
+        })
 
     fun resource(id: String): Resource = resources.firstOrNull { it.id == id }
         ?: throw LauncherException("The catalog has no '$id' entry. Reinstall the launcher.")
 
     val approxDownloadMb: Int get() = resources.sumOf { it.approxMb } + modpack.approxMb + 900
+
+    fun instance(id: String): InstanceSpec? = instances.firstOrNull { it.id == id }
 
     companion object {
         @Volatile private var loaded: Catalog? = null

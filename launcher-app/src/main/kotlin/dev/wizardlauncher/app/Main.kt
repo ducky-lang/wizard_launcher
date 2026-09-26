@@ -8,6 +8,8 @@ import dev.wizardlauncher.core.LauncherException
 import dev.wizardlauncher.core.auth.Account
 import dev.wizardlauncher.core.install.OfflineBundle
 import dev.wizardlauncher.core.install.Progress
+import dev.wizardlauncher.core.instance.Instance
+import dev.wizardlauncher.legacy.LegacyTranslator
 import dev.wizardlauncher.legacy.PackExporter
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
@@ -58,6 +60,9 @@ fun main(args: Array<String>) {
     SwingUtilities.invokeLater { MainWindow(launcher).isVisible = true }
 }
 
+private fun option(args: Array<String>, name: String): String? =
+    args.indexOf(name).takeIf { it >= 0 }?.let { args.getOrNull(it + 1) }
+
 private fun runCli(args: Array<String>): Boolean {
     val progress = Progress { f, m -> println(if (f != null) "[%3d%%] %s".format((f * 100).toInt(), m) else "[....] $m") }
     when (args[0]) {
@@ -66,23 +71,36 @@ private fun runCli(args: Array<String>): Boolean {
         "--convert-pack", "--export-pack" -> {
             require(args.size >= 3) { HELP }
             val rules = args.drop(3).windowed(2, 2).filter { it[0] == "--rules" }.map { Files.readString(Path.of(it[1])) }
-            val overlay = PackExporter.export(Path.of(args[1]), Path.of(args[2]), rules, null)
+            val target = option(args, "--target")?.let { mc ->
+                Instance.PACK_FORMATS[mc] ?: throw LauncherException("Packs can be exported for ${Instance.PACK_FORMATS.keys.joinToString(" or ")}, not $mc.")
+            } ?: LegacyTranslator.TARGET_FORMAT
+            val overlay = PackExporter.export(Path.of(args[1]), Path.of(args[2]), rules, null, target)
             println(overlay.report())
         }
-        "--verify-install" -> println(Launcher().verifyInstall(progress))
+        "--verify-install" -> println(Launcher().verifyInstall(progress, instanceId = option(args, "--instance")))
         "--smoke-client" -> {
-            val timeout = args.getOrNull(args.indexOf("--timeout") + 1)?.takeIf { "--timeout" in args }?.toLong() ?: 240
-            val pack = args.getOrNull(args.indexOf("--pack") + 1)?.takeIf { "--pack" in args }?.let(Path::of)
-            val report = Launcher().smokeClient(progress, timeout, pack)
+            val timeout = option(args, "--timeout")?.toLong() ?: 240
+            val pack = option(args, "--pack")?.let(Path::of)
+            val report = Launcher().smokeClient(progress, timeout, pack, option(args, "--instance"))
             println(report)
             if (report.lines().any { it.startsWith("[--]") }) exitProcess(3)
         }
         "--world-selftest" -> println(Launcher().selfTestWorld(progress))
+        "--list-instances" -> Launcher().instances.let { m ->
+            val selected = m.selected().id
+            m.all().forEach { println("${if (it.id == selected) "*" else " "} ${it.id.padEnd(28)} Minecraft ${it.minecraft.padEnd(8)} ${it.name}") }
+        }
+        "--import-modpack" -> {
+            require(args.size >= 2) { HELP }
+            val added = Launcher().instances.importModpack(Path.of(args[1]))
+            println("Imported as '${added.id}'. Play it with --play --instance ${added.id}")
+        }
         "--export-bundle" -> OfflineBundle.export(AppPaths.default().ensure(), Path.of(args[1]), progress)
         "--import-bundle" -> OfflineBundle.import(AppPaths.default().ensure(), Path.of(args[1]), progress)
         "--play" -> {
             val launcher = Launcher()
-            val name = args.getOrNull(args.indexOf("--name") + 1)?.takeIf { "--name" in args }
+            option(args, "--instance")?.let { launcher.instances.select(it) }
+            val name = option(args, "--name")
             val account = name?.let(Account::offline) ?: launcher.accounts.current()
                 ?: throw LauncherException("No account: pass --name <player> or sign in from the launcher window once.")
             val client = launcher.play(account, progress)
@@ -111,11 +129,13 @@ private fun runCli(args: Array<String>): Boolean {
 private val HELP = """
     Wizard Launcher ${BuildInfo.version}
       (no arguments)                         open the launcher
-      --play [--name <player>]               install if needed and play, no window
-      --export-pack <in> <out.zip> [--rules states.json]...
-                                             write a 1.20.1-format copy of an older pack
-      --verify-install                       install or repair the game and check every file
-      --smoke-client [--pack p.zip] [--timeout s]   start Minecraft briefly and check it loads
+      --play [--name <player>] [--instance id]   install if needed and play, no window
+      --list-instances                       list the installations (* = selected)
+      --import-modpack <file.mrpack>         add a Fabric modpack from Modrinth as a new installation
+      --export-pack <in> <out.zip> [--target 1.20.1|1.21.1] [--rules states.json]...
+                                             write a modern copy of an older pack
+      --verify-install [--instance id]       install or repair the game and check every file
+      --smoke-client [--instance id] [--pack p.zip] [--timeout s]   start Minecraft briefly and check it loads
       --world-selftest                       start the world + bridge, ping it as 1.20.1, stop (offline)
       --export-bundle <file.wizardpack>      pack this install for an offline computer
       --import-bundle <file.wizardpack>      install from a bundle, no internet needed

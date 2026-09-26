@@ -20,6 +20,8 @@ class ClientRunner(
     private val supervisor: ProcessSupervisor,
     private val javaExe: Path,
     private val bootJar: Path,
+    private val gameDir: Path = paths.gameDir,
+    private val javaMajor: Int = 17,
 ) {
     class Plan(val command: List<String>, val mainClass: String, val gameArgs: List<String>)
 
@@ -36,7 +38,7 @@ class ClientRunner(
         val vars = mapOf(
             "auth_player_name" to account.name,
             "version_name" to profile.id,
-            "game_directory" to paths.gameDir.toString(),
+            "game_directory" to gameDir.toString(),
             "assets_root" to paths.assets.toString(),
             "assets_index_name" to profile.assetIndex,
             "auth_uuid" to account.uuid,
@@ -60,7 +62,7 @@ class ClientRunner(
         val game = expand(profile.gameArgs, vars, features)
         val command = ArrayList<String>()
         command += javaExe.toString()
-        command += JvmFlags.client(settings.effectiveClientRamMb)
+        command += JvmFlags.client(settings.effectiveClientRamMb, javaMajor, gameDir.resolve(".wizard-cds.jsa"))
         command += "-Djava.awt.headless=true"
         if (waitForWorld && joinAddress != null) command += "-Dwizard.waitForWorld=true"
         command += jvm
@@ -75,11 +77,11 @@ class ClientRunner(
         val plan = plan(profile, account, joinAddress, waitForWorld)
         val command = plan.command
         val game = plan.gameArgs
-        GameOptions.setFullscreen(paths.gameDir.resolve("options.txt"), settings.fullscreen)
+        GameOptions.setFullscreen(gameDir.resolve("options.txt"), settings.fullscreen)
         Log.file("Client command: " + command.joinToString(" ") { if (it.length > 300) it.take(80) + "...(${it.length} chars)" else it })
         val output = paths.logs.resolve("client-output.log").toFile()
         val process = ProcessBuilder(command)
-            .directory(paths.gameDir.toFile())
+            .directory(gameDir.toFile())
             .redirectErrorStream(true)
             .redirectOutput(ProcessBuilder.Redirect.to(output))
             .start()
