@@ -1,4 +1,4 @@
-## Wizard Launcher 2.1.0 · Two Versions & Modpacks
+## Wizard Launcher 3.0.0 · Two Versions & Modpacks
 
 The castle can now be played on Minecraft 1.21.1 as well as 1.20.1, Modrinth modpacks can be imported, the resource pack download is reliable, and the first launch is much faster.
 
@@ -39,7 +39,7 @@ The castle can now be played on Minecraft 1.21.1 as well as 1.20.1, Modrinth mod
 
 | System | File |
 |---|---|
-| Windows 10/11 (64-bit) | `WizardLauncher-Windows-Setup-2.1.0.exe` |
+| Windows 10/11 (64-bit) | `WizardLauncher-Windows-Setup-3.0.0.exe` |
 | macOS (Apple silicon) | `WizardLauncher-macOS.dmg` |
 | Linux (x86_64) | `WizardLauncher-Linux-x86_64.AppImage` |
 

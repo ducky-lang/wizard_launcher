@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "2.1.0"
+  #define MyAppVersion "3.0.0"
 #endif
 #define MyAppName "Wizard Launcher"
 #define MyAppPublisher "Foxy"
