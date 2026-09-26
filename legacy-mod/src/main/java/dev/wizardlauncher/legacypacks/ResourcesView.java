@@ -29,7 +29,7 @@ final class ResourcesView implements PackView {
             return null;
         }
         try {
-            return new ResourceLocation(path.substring(7, slash), path.substring(slash + 1));
+            return Compat.location(path.substring(7, slash), path.substring(slash + 1));
         } catch (ResourceLocationException e) {
             return null;
         }

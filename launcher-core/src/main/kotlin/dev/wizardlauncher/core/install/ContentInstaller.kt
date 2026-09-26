@@ -70,7 +70,9 @@ class ContentInstaller(
     }
 
     fun ensureLegacyPackSupport(): Boolean {
-        val bundled = paths.resources.resolve("mods").resolve(LEGACY_MOD)
+        val bundled = listOf("wizard-legacy-packs-${catalog.minecraft.clientVersion}.jar", LEGACY_MOD)
+            .map { paths.resources.resolve("mods").resolve(it) }.firstOrNull(Files::isRegularFile)
+            ?: paths.resources.resolve("mods").resolve(LEGACY_MOD)
         val target = paths.gameDir.resolve("mods").resolve(LEGACY_MOD)
         if (!Files.isRegularFile(bundled)) {
             Log.info("Legacy pack support is not part of this build; older resource packs may not display correctly.")

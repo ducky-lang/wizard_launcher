@@ -15,13 +15,13 @@ import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.resources.IoSupplier;
 
-public final class LegacyPackResources implements PackResources {
-    private final PackResources delegate;
+abstract class OverlayPackResources implements PackResources {
+    protected final PackResources delegate;
     private final CompletableFuture<Overlay> pending;
     private volatile Overlay overlay;
     private volatile boolean failed;
 
-    LegacyPackResources(PackResources delegate, CompletableFuture<Overlay> pending) {
+    OverlayPackResources(PackResources delegate, CompletableFuture<Overlay> pending) {
         this.delegate = delegate;
         this.pending = pending;
     }
@@ -39,7 +39,7 @@ public final class LegacyPackResources implements PackResources {
             synchronized (this) {
                 if (!failed) {
                     failed = true;
-                    LegacyPacks.LOGGER.error("Could not adapt '{}'; loading it unchanged", packId(), e.getCause() != null ? e.getCause() : e);
+                    LegacyPacks.LOGGER.error("Could not adapt '{}'; loading it unchanged", delegate.packId(), e.getCause() != null ? e.getCause() : e);
                 }
             }
             return null;
@@ -145,16 +145,6 @@ public final class LegacyPackResources implements PackResources {
     @Override
     public <T> T getMetadataSection(MetadataSectionSerializer<T> serializer) throws IOException {
         return delegate.getMetadataSection(serializer);
-    }
-
-    @Override
-    public String packId() {
-        return delegate.packId();
-    }
-
-    @Override
-    public boolean isBuiltin() {
-        return delegate.isBuiltin();
     }
 
     @Override

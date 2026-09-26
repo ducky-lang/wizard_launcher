@@ -64,7 +64,7 @@ final class OverlayCache {
                 return hit;
             }
         }
-        Overlay fresh = LegacyTranslator.translate(view, format, rules, null);
+        Overlay fresh = LegacyTranslator.translate(view, format, rules, null, Compat.TARGET_FORMAT);
         logReady(packId, format, fresh, started, "");
         writeReport(packId, fresh);
         if (key != null) {
@@ -87,7 +87,7 @@ final class OverlayCache {
             return null;
         }
         MessageDigest digest = sha256();
-        update(digest, "rev" + LegacyTranslator.REVISION + "|format" + format);
+        update(digest, "rev" + LegacyTranslator.REVISION + "|format" + format + "|target" + Compat.TARGET_FORMAT);
         for (String r : rules) {
             update(digest, r);
         }

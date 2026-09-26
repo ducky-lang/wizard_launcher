@@ -24,12 +24,16 @@ public final class PackExporter {
     }
 
     public static Overlay export(Path input, Path output, List<String> extraRules, Predicate<String> vanilla) throws IOException {
+        return export(input, output, extraRules, vanilla, LegacyTranslator.TARGET_FORMAT);
+    }
+
+    public static Overlay export(Path input, Path output, List<String> extraRules, Predicate<String> vanilla, int targetFormat) throws IOException {
         try (FilePackView view = FilePackView.open(input)) {
             int format = view.exists("pack.mcmeta") ? LegacyTranslator.readFormat(view.read("pack.mcmeta")) : -1;
             if (format < 0) {
                 throw new IOException("not a resource pack (pack.mcmeta missing or unreadable)");
             }
-            Overlay overlay = LegacyTranslator.translate(view, format, extraRules, vanilla);
+            Overlay overlay = LegacyTranslator.translate(view, format, extraRules, vanilla, targetFormat);
             write(view, overlay, output);
             return overlay;
         }

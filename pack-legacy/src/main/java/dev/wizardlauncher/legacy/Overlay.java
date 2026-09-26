@@ -24,9 +24,11 @@ public final class Overlay {
     private final List<String> info = new ArrayList<>();
     private final List<String> warnings = new ArrayList<>();
     private final int sourceFormat;
+    private final int targetFormat;
 
-    Overlay(int sourceFormat) {
+    Overlay(int sourceFormat, int targetFormat) {
         this.sourceFormat = sourceFormat;
+        this.targetFormat = targetFormat;
     }
 
     void put(String path, byte[] data) {
@@ -47,6 +49,10 @@ public final class Overlay {
 
     public int sourceFormat() {
         return sourceFormat;
+    }
+
+    public int targetFormat() {
+        return targetFormat;
     }
 
     public Map<String, byte[]> files() {
@@ -79,7 +85,7 @@ public final class Overlay {
 
     public String report() {
         StringBuilder b = new StringBuilder();
-        b.append("Wizard Legacy Packs - pack_format ").append(sourceFormat).append(" read as ").append(LegacyTranslator.TARGET_FORMAT).append('\n');
+        b.append("Wizard Legacy Packs - pack_format ").append(sourceFormat).append(" read as ").append(targetFormat).append('\n');
         b.append("rewritten: ").append(files.size()).append(", aliased: ").append(aliases.size()).append(", warnings: ").append(warnings.size()).append("\n\n");
         if (!info.isEmpty()) {
             b.append("Changes:\n");
@@ -99,6 +105,7 @@ public final class Overlay {
         JsonObject index = new JsonObject();
         index.addProperty("revision", LegacyTranslator.REVISION);
         index.addProperty("source_format", sourceFormat);
+        index.addProperty("target_format", targetFormat);
         JsonArray names = new JsonArray();
         files.keySet().forEach(names::add);
         index.add("files", names);
@@ -139,7 +146,8 @@ public final class Overlay {
         if (index == null || index.get("revision").getAsInt() != LegacyTranslator.REVISION) {
             throw new IOException("stale or incomplete overlay");
         }
-        Overlay overlay = new Overlay(index.get("source_format").getAsInt());
+        Overlay overlay = new Overlay(index.get("source_format").getAsInt(),
+            index.has("target_format") ? index.get("target_format").getAsInt() : LegacyTranslator.TARGET_FORMAT);
         JsonArray names = index.getAsJsonArray("files");
         for (int i = 0; i < names.size(); i++) {
             byte[] data = blobs.get(i);

@@ -31,7 +31,7 @@ public final class LegacyPacks {
     }
 
     private static PackResources wrapOne(PackResources pack) {
-        if (pack.isBuiltin() || pack instanceof LegacyPackResources) {
+        if (Compat.isBuiltin(pack) || pack instanceof LegacyPackResources) {
             return pack;
         }
         try {
@@ -43,7 +43,7 @@ public final class LegacyPacks {
             try (InputStream in = meta.get()) {
                 format = LegacyTranslator.readFormat(in.readAllBytes());
             }
-            if (!LegacyTranslator.needsTranslation(format)) {
+            if (!LegacyTranslator.needsTranslation(format, Compat.TARGET_FORMAT)) {
                 return pack;
             }
             ResourcesView view = new ResourcesView(pack);

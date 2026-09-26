@@ -104,6 +104,69 @@
           "to": "assets/minecraft/textures/entity/player/slim/alex.png"
         }
       ]
+    },
+    {
+      "max_format": 21,
+      "min_target": 22,
+      "copy_files": [
+        {
+          "from": "assets/minecraft/blockstates/grass.json",
+          "to": "assets/minecraft/blockstates/short_grass.json"
+        },
+        {
+          "from": "assets/minecraft/models/block/grass.json",
+          "to": "assets/minecraft/models/block/short_grass.json"
+        },
+        {
+          "from": "assets/minecraft/models/item/grass.json",
+          "to": "assets/minecraft/models/item/short_grass.json"
+        },
+        {
+          "from": "assets/minecraft/textures/block/grass.png",
+          "to": "assets/minecraft/textures/block/short_grass.png"
+        },
+        {
+          "from": "assets/minecraft/textures/block/grass.png.mcmeta",
+          "to": "assets/minecraft/textures/block/short_grass.png.mcmeta"
+        }
+      ],
+      "rename_references": {
+        "models": {
+          "minecraft:block/grass": "minecraft:block/short_grass",
+          "minecraft:item/grass": "minecraft:item/short_grass"
+        },
+        "textures": {
+          "minecraft:block/grass": "minecraft:block/short_grass"
+        }
+      },
+      "lang_keys": {
+        "block.minecraft.grass": "block.minecraft.short_grass"
+      }
+    },
+    {
+      "max_format": 31,
+      "min_target": 32,
+      "copy_files": [
+        {
+          "from": "assets/minecraft/models/item/scute.json",
+          "to": "assets/minecraft/models/item/turtle_scute.json"
+        },
+        {
+          "from": "assets/minecraft/textures/item/scute.png",
+          "to": "assets/minecraft/textures/item/turtle_scute.png"
+        }
+      ],
+      "rename_references": {
+        "models": {
+          "minecraft:item/scute": "minecraft:item/turtle_scute"
+        },
+        "textures": {
+          "minecraft:item/scute": "minecraft:item/turtle_scute"
+        }
+      },
+      "lang_keys": {
+        "item.minecraft.scute": "item.minecraft.turtle_scute"
+      }
     }
   ]
 }

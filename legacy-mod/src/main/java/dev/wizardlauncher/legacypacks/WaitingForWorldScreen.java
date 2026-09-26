@@ -4,12 +4,11 @@ import dev.wizardlauncher.legacypacks.mixin.QuickPlayAccessor;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.screens.GenericDirtMessageScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
-public final class WaitingForWorldScreen extends GenericDirtMessageScreen {
+public final class WaitingForWorldScreen extends MessageScreen {
     private static final long GIVE_UP_MS = 5 * 60_000L;
     private static final long PROBE_EVERY_MS = 500;
     private final String address;

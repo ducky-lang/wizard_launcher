@@ -25,8 +25,9 @@ import java.util.function.Predicate;
 
 public final class LegacyTranslator {
     public static final int TARGET_FORMAT = 15;
+    public static final int FORMAT_1_21_1 = 34;
     public static final int OLDEST_FORMAT = 4;
-    public static final int REVISION = 4;
+    public static final int REVISION = 5;
     public static final String PACK_RULES = "wizard-states.json";
     public static final Set<String> VANILLA_TEXTURE_ROOTS = Set.of(
         "entity", "misc", "environment", "gui", "font", "painting", "mob_effect", "particle",
@@ -36,6 +37,7 @@ public final class LegacyTranslator {
 
     private final PackView pack;
     private final int sourceFormat;
+    private final int targetFormat;
     private final Rules rules;
     private final Overlay overlay;
     private final Map<String, JsonElement> json = new LinkedHashMap<>();
@@ -47,16 +49,21 @@ public final class LegacyTranslator {
     private static final String DEFAULT_FONT = "assets/minecraft/font/default.json";
     private static final String SOUNDS = "assets/minecraft/sounds.json";
 
-    private LegacyTranslator(PackView pack, int sourceFormat, Rules rules, Predicate<String> vanilla) {
+    private LegacyTranslator(PackView pack, int sourceFormat, int targetFormat, Rules rules, Predicate<String> vanilla) {
         this.pack = pack;
         this.sourceFormat = sourceFormat;
+        this.targetFormat = targetFormat;
         this.rules = rules;
-        this.overlay = new Overlay(sourceFormat);
+        this.overlay = new Overlay(sourceFormat, targetFormat);
         this.vanilla = vanilla;
     }
 
     public static boolean needsTranslation(int format) {
-        return format >= OLDEST_FORMAT && format < TARGET_FORMAT;
+        return needsTranslation(format, TARGET_FORMAT);
+    }
+
+    public static boolean needsTranslation(int format, int targetFormat) {
+        return format >= OLDEST_FORMAT && format < targetFormat;
     }
 
     public static int readFormat(byte[] packMcmeta) {
@@ -69,7 +76,12 @@ public final class LegacyTranslator {
     }
 
     public static Overlay translate(PackView pack, int sourceFormat, List<String> extraRules, Predicate<String> vanillaAsset) throws IOException {
-        Rules rules = Rules.builtin(sourceFormat);
+        return translate(pack, sourceFormat, extraRules, vanillaAsset, TARGET_FORMAT);
+    }
+
+    public static Overlay translate(PackView pack, int sourceFormat, List<String> extraRules, Predicate<String> vanillaAsset,
+                                    int targetFormat) throws IOException {
+        Rules rules = Rules.builtin(sourceFormat, targetFormat);
         List<String> applied = new ArrayList<>();
         if (pack.exists(PACK_RULES)) {
             rules.merge(Rules.parse(pack.readText(PACK_RULES), PACK_RULES));
@@ -80,7 +92,7 @@ public final class LegacyTranslator {
             rules.merge(Rules.parse(text, "rules #" + (++i)));
             applied.add("rules #" + i);
         }
-        LegacyTranslator t = new LegacyTranslator(pack, sourceFormat, rules, vanillaAsset);
+        LegacyTranslator t = new LegacyTranslator(pack, sourceFormat, targetFormat, rules, vanillaAsset);
         applied.forEach(a -> t.overlay.info("applied state rules from " + a));
         t.run();
         return t.overlay;
@@ -118,7 +130,7 @@ public final class LegacyTranslator {
                     edit(path, root -> renameLangKeys(root.getAsJsonObject()));
                 }
             }
-            if (sourceFormat < TARGET_FORMAT) {
+            if (sourceFormat < targetFormat) {
                 for (String path : pack.list(ns, "font")) {
                     if (path.endsWith(".json")) {
                         edit(path, root -> {
@@ -146,6 +158,9 @@ public final class LegacyTranslator {
         upgradeSounds();
         if (!defaultFontHasLegacyPages) {
             addImplicitGlyphPages();
+        }
+        if (targetFormat >= GuiSprites.FIRST_SPRITE_FORMAT && sourceFormat < GuiSprites.FIRST_SPRITE_FORMAT) {
+            new GuiSprites(pack, overlay).apply(this::provided);
         }
         if (sourceFormat < 12) {
             generateAtlas();
@@ -242,13 +257,13 @@ public final class LegacyTranslator {
         }
         JsonObject o = root.getAsJsonObject();
         JsonObject p = o.has("pack") ? o.getAsJsonObject("pack") : new JsonObject();
-        p.addProperty("pack_format", TARGET_FORMAT);
+        p.addProperty("pack_format", targetFormat);
         o.add("pack", p);
         JsonObject tag = new JsonObject();
         tag.addProperty("source_pack_format", sourceFormat);
         o.add("wizard_legacy_packs", tag);
         json.put("pack.mcmeta", o);
-        overlay.info("pack.mcmeta: pack_format " + sourceFormat + " read as " + TARGET_FORMAT);
+        overlay.info("pack.mcmeta: pack_format " + sourceFormat + " read as " + targetFormat);
     }
 
     private String renameModelRef(String ref) {

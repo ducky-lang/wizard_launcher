@@ -300,6 +300,44 @@ class LegacyTranslatorTest {
         assertEquals("assets/minecraft/textures/entity/steve.png", o.aliasOf("assets/minecraft/textures/entity/player/wide/steve.png"))
     }
 
+    private fun sheet(size: Int, paint: (BufferedImage) -> Unit): ByteArray {
+        val img = BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB)
+        paint(img)
+        return ByteArrayOutputStream().also { ImageIO.write(img, "png", it) }.toByteArray()
+    }
+
+    @Test fun `on 1_21_1 old GUI sheets are cut into the new sprites`() {
+        val files = minimal()
+        files["assets/minecraft/textures/gui/widgets.png"] = sheet(512) { img ->
+            for (y in 132 until 172) for (x in 0 until 400) img.setRGB(x, y, 0xFF224488.toInt())
+            for (y in 0 until 44) for (x in 0 until 364) img.setRGB(x, y, 0xFF884422.toInt())
+        }
+        val o = FilePackView.open(zipOf(files)).use { LegacyTranslator.translate(it, 6, listOf(), null, LegacyTranslator.FORMAT_1_21_1) }
+        val button = ImageIO.read(ByteArrayInputStream(assertNotNull(o.file("assets/minecraft/textures/gui/sprites/widget/button.png"))))
+        assertEquals(400, button.width)
+        assertEquals(40, button.height)
+        assertEquals(0xFF224488.toInt(), button.getRGB(10, 10))
+        val meta = o.json("assets/minecraft/textures/gui/sprites/widget/button.png.mcmeta")
+        assertEquals("nine_slice", meta.getAsJsonObject("gui").getAsJsonObject("scaling").get("type").asString)
+        val hotbar = ImageIO.read(ByteArrayInputStream(assertNotNull(o.file("assets/minecraft/textures/gui/sprites/hud/hotbar.png"))))
+        assertEquals(364, hotbar.width)
+        assertNull(o.file("assets/minecraft/textures/gui/sprites/widget/button_disabled.png"))
+        assertEquals(34, o.json("pack.mcmeta").getAsJsonObject("pack").get("pack_format").asInt)
+    }
+
+    @Test fun `grass is read as short grass only where the game renamed it`() {
+        val files = minimal("assets/minecraft/models/block/tuft.json" to """{"parent":"block/cross","textures":{"cross":"block/grass"}}""")
+        files["assets/minecraft/textures/block/grass.png"] = "png".toByteArray()
+        val modern = FilePackView.open(zipOf(files)).use { LegacyTranslator.translate(it, 6, listOf(), null, LegacyTranslator.FORMAT_1_21_1) }
+        assertEquals("assets/minecraft/textures/block/grass.png", modern.aliasOf("assets/minecraft/textures/block/short_grass.png"))
+        assertNull(modern.file("assets/minecraft/models/block/tuft.json"))
+        val classic = overlay(files)
+        assertNull(classic.aliasOf("assets/minecraft/textures/block/short_grass.png"))
+        assertNull(classic.file("assets/minecraft/textures/gui/sprites/widget/button.png"))
+        assertTrue(LegacyTranslator.needsTranslation(15, LegacyTranslator.FORMAT_1_21_1))
+        assertFalse(LegacyTranslator.needsTranslation(15))
+    }
+
     @Test fun `unsafe paths and bad rules are refused`() {
         assertFalse(FilePackView.safePath("../evil.txt"))
         assertFalse(FilePackView.safePath("assets/../../x"))

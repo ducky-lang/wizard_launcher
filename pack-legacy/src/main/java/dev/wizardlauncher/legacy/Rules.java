@@ -46,6 +46,10 @@ public final class Rules {
     }
 
     public static Rules builtin(int sourceFormat) {
+        return builtin(sourceFormat, LegacyTranslator.TARGET_FORMAT);
+    }
+
+    public static Rules builtin(int sourceFormat, int targetFormat) {
         try (InputStream in = Rules.class.getResourceAsStream("builtin-rules.json")) {
             if (in == null) {
                 throw new IllegalStateException("built-in rules missing");
@@ -54,7 +58,8 @@ public final class Rules {
             Rules rules = new Rules();
             for (JsonElement stage : root.getAsJsonArray("stages")) {
                 JsonObject o = stage.getAsJsonObject();
-                if (sourceFormat <= o.get("max_format").getAsInt()) {
+                int minTarget = o.has("min_target") ? o.get("min_target").getAsInt() : 0;
+                if (sourceFormat <= o.get("max_format").getAsInt() && targetFormat >= minTarget) {
                     rules.merge(parse(o, "built-in"));
                 }
             }
