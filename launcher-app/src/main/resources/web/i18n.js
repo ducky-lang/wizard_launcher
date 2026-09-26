@@ -65,10 +65,10 @@ const I18N = {
     "toast.repaired": "All game files are in place", "toast.exported": "Saved to {path}", "toast.copied": "Copied", "toast.stopped": "The world has been saved",
     "toast.error": "Something went wrong", "toast.gameClosed": "Minecraft closed", "toast.update": "A new version is available",
     "time.never": "never", "time.now": "just now", "time.min": "{n} min ago", "time.hour": "{n} h ago", "time.day": "{n} d ago",
-    "news.1": "Minecraft 1.21.1 joins 1.20.1: pick the version beside Play. Each keeps its own mods, settings and screenshots.",
-    "news.2": "Import Fabric modpacks from Modrinth (.mrpack) as new installations.",
-    "news.3": "On 1.21.1, conversations hold you still again, NPCs stop bobbing and the castle's own HUD shows exactly as on 1.20.1.",
-    "news.4": "Both versions now run the lightweight FPS Modpack: Sodium, Iris and ImmediatelyFast, without extra client mods.",
-    "news.5": "Faster start: the castle downloads alongside the game, the pack installs without unpacking and Java 21 reuses a class cache.",
+    "news.1": "Play the castle on Minecraft 1.20.1 or 1.21.1: pick the version beside Play. Each keeps its own mods, settings and screenshots.",
+    "news.2": "Import Fabric modpacks from Modrinth (.mrpack) as extra installations that join the same castle.",
+    "news.3": "The castle's 1.16.5 resource pack, HUD, conversations and characters look and behave as the map was made, on both versions.",
+    "news.4": "Lightweight FPS Modpack, parallel downloads and a single process for the world and the bridge keep things fast.",
+    "news.5": "Plays offline once installed; offline bundles move an install to another computer.",
   }
 };

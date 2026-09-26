@@ -74,7 +74,7 @@ A fast, polished UI rendered by an embedded Chromium engine (JCEF). Motion is li
 - Screenshot gallery.
 - World backups and restore.
 - Live console and crash assistant.
-- Tray mode, and English and Vietnamese.
+- Tray mode and a first-run guide.
 
 </td>
 </tr>
@@ -128,12 +128,15 @@ The installer carries its own Java 17 runtime, which runs the launcher, the worl
 
 ### The castle on 1.21.1
 
-The bundled mod also keeps two 1.16.5 behaviours that newer clients changed, so the castle plays the same on 1.21.1 as on 1.20.1:
+The bundled mod also keeps three 1.16.5 behaviours that newer clients changed, so the castle plays the same on 1.21.1 as on 1.20.1. They apply only when connected to the castle (the local world or a LAN host running it):
 
-- **Effect strengths.** Minecraft 1.20.5 clamps effect amplifiers to 0–255, but 1.16.5 maps rely on negative strengths, such as levitation 255 (signed −1) to hold the player perfectly still during conversations. Effects coming from the local world keep their 1.16.5 strength.
+- **Effect strengths.** Minecraft 1.20.5 clamps effect amplifiers to 0–255, but 1.16.5 maps rely on negative strengths, such as levitation 255 (signed −1) to hold the player perfectly still during conversations. Effects keep their 1.16.5 strength, so conversation choices stay put and the camera does not shake.
+- **Stacked models.** 1.20.2 moved riders from three quarters of the vehicle's height to the top of it. Characters such as Hagrid are built from armour stands riding each other, so they came apart. Riders on armour stands, bats, zombies, skeletons and other plain entities are placed as in 1.20.1 again.
 - **Hidden HUD parts.** When a pack blanks out parts of the old GUI sheets (hotbar, hearts, boss bars) to draw its own HUD, the matching 1.21.1 sprites stay blank instead of falling back to the vanilla graphics.
 
-### Speed
+### Speed and smoothness
+
+- New installations start with settings the castle is tuned for (mipmap level 3, render distance 10, no entity shadows) and without Minecraft's first-run popups.
 
 - The castle and its resource pack download **alongside** Minecraft, Fabric, the modpack and Java instead of before them, and the modpack's mods download in parallel.
 - The resource pack is installed as its zip, hard-linked from the download cache, so thousands of files are never unpacked or copied.

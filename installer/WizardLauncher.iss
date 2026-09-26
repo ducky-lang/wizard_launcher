@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "3.0.1"
+  #define MyAppVersion "1.0.0"
 #endif
 #define MyAppName "Wizard Launcher"
 #define MyAppPublisher "Foxy"
@@ -14,10 +14,12 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 VersionInfoVersion={#MyAppVersion}
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
 DefaultDirName={localappdata}\Programs\{#MyDataDirName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
+DisableDirPage=yes
+DisableReadyPage=yes
+CloseApplications=yes
 AllowNoIcons=yes
 OutputDir=..\build_installer
 OutputBaseFilename=WizardLauncher-Windows-Setup-{#MyAppVersion}
