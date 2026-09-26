@@ -231,4 +231,25 @@ class CoreTest {
         assertTrue(art != null && art.size > 100)
         assertNull(HeroArt(dir.resolve("empty"), cache, ScreenshotLibrary(dir.resolve("empty"), cache)).image())
     }
+
+    @Test
+    fun sodiumExtraKeepsParticlesAndToasts(@TempDir dir: Path) {
+        val game = dir.resolve("game")
+        val live = Files.createDirectories(game.resolve("config")).resolve("sodium-extra-options.json")
+        val defaults = Files.createDirectories(game.resolve("config/yosbr/config")).resolve("sodium-extra-options.json")
+        val off = """{"particle_settings":{"particles":false,"rain_splash":true},"extra_settings":{"toasts":false,"advancement_toast":false,"show_fps":false}}"""
+        Files.writeString(live, off)
+        Files.writeString(defaults, off)
+        ModConfigs.enforce(game)
+        for (f in listOf(live, defaults)) {
+            val o = JsonParser.parseString(Files.readString(f)).asJsonObject
+            assertTrue(o.getAsJsonObject("particle_settings").get("particles").asBoolean)
+            assertTrue(o.getAsJsonObject("particle_settings").get("rain_splash").asBoolean)
+            assertTrue(o.getAsJsonObject("extra_settings").get("toasts").asBoolean)
+            assertTrue(o.getAsJsonObject("extra_settings").get("advancement_toast").asBoolean)
+            assertFalse(o.getAsJsonObject("extra_settings").get("show_fps").asBoolean)
+        }
+        assertFalse(ModConfigs.patchJson(live, mapOf("particle_settings.particles" to true)))
+        assertFalse(ModConfigs.patchJson(dir.resolve("missing.json"), mapOf("a" to true)))
+    }
 }
