@@ -46,19 +46,28 @@ if win:
     xdo("windowactivate", "--sync", win[0])
     xdo("mousemove", "640", "360")
 time.sleep(2)
-for i in range(3):
-    shot(f"idle{i}")
-    time.sleep(0.4)
-for i in range(3):
-    xdo("click", "5")
-    time.sleep(2.5)
-    shot(f"scrolldown{i+1}")
-for i in range(3):
-    xdo("click", "4")
-    time.sleep(2.5)
-    shot(f"scrollup{i+1}")
+
+def burst(label, n=3, gap=0.35):
+    for i in range(n):
+        shot(f"{label}-{i}")
+        time.sleep(gap)
+
+def key(k):
+    xdo("key", "--delay", "80", k)
+
+key("f")
+time.sleep(4)
+shot("f1")
+for step in range(16):
+    time.sleep(6)
+    burst(f"s{step:02d}", 2 if step % 3 else 3)
+    if step in (5, 9, 13):
+        xdo("click", "4")
+        time.sleep(1.5)
+        shot(f"s{step:02d}-up")
+    key("f")
 time.sleep(5)
-shot("after")
+shot("end")
 t = text()
 chat = [l for l in t.splitlines() if "[CHAT]" in l]
 print(f"@@CHAT {len(chat)} lines")
@@ -77,7 +86,7 @@ for f in glob.glob(os.path.join(game, "logs/wizard-legacy-packs/*")):
     print(open(f, encoding="utf-8", errors="replace").read()[:15000])
 print("@@PLAYLOG")
 print(open("play.log", encoding="utf-8", errors="replace").read()[-6000:])
-if MC == "1.21.1":
+if MC == "never":
     fn = os.path.join(DATA, "resources/servers/1.16.5/world/datapacks/hp/data/hp/functions")
     tick = glob.glob(os.path.join(DATA, "resources/servers/1.16.5/world/datapacks/hp/data/minecraft/tags/functions/*.json"))
     for f in tick:

@@ -3,11 +3,11 @@ plugins {
     java
 }
 
-data class Target(val loader: String, val java: Int, val sources: String)
+data class Target(val loader: String, val java: Int, val sources: String, val mixins: List<String> = emptyList())
 
 val targets = mapOf(
     "1.20.1" to Target("0.15.11", 17, "v1_20_1"),
-    "1.21.1" to Target("0.16.9", 21, "v1_21_1"),
+    "1.21.1" to Target("0.16.9", 21, "v1_21_1", listOf("EffectPacketMixin", "MobEffectInstanceMixin")),
 )
 val mc = (findProperty("mc") as String?) ?: "1.20.1"
 val target = targets[mc] ?: error("Wizard Legacy Packs does not support Minecraft $mc (supported: ${targets.keys})")
@@ -46,7 +46,10 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.processResources {
-    val props = mapOf("version" to project.version, "minecraft" to mc, "java" to target.java)
+    val props = mapOf(
+        "version" to project.version, "minecraft" to mc, "java" to target.java,
+        "versionMixins" to target.mixins.joinToString("") { ",\n    \"$it\"" },
+    )
     inputs.properties(props)
     filesMatching(listOf("fabric.mod.json", "wizard_legacy_packs.mixins.json")) { expand(props) }
 }

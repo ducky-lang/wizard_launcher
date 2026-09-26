@@ -7,7 +7,7 @@
     "PackCompatibilityMixin",
     "PackRepositoryMixin",
     "QuickPlayAccessor",
-    "QuickPlayMixin"
+    "QuickPlayMixin"${versionMixins}
   ],
   "injectors": {
     "defaultRequire": 1
