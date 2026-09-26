@@ -147,6 +147,17 @@ for l in t.splitlines():
 for f in glob.glob(os.path.join(game, "logs/wizard-legacy-packs/*")):
     print("@@REPORT", f)
     print(open(f, encoding="utf-8", errors="replace").read()[:15000])
+print("@@CONFIG")
+for root, _, files in os.walk(os.path.join(game, "config")):
+    for f in files:
+        full = os.path.join(root, f)
+        if any(k in f.lower() for k in ["sodium", "extra", "particle", "toast", "immediatelyfast", "moreculling", "entityculling", "iris"]):
+            print("@@CFG", os.path.relpath(full, game))
+            print(open(full, encoding="utf-8", errors="replace").read()[:4000])
+opt = os.path.join(game, "options.txt")
+if os.path.exists(opt):
+    print("@@OPTIONS")
+    print(open(opt, encoding="utf-8", errors="replace").read()[:6000])
 print("@@PLAYLOG")
 print(open("play.log", encoding="utf-8", errors="replace").read()[-6000:])
 if False:
