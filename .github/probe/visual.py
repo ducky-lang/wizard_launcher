@@ -75,7 +75,6 @@ open(os.path.join(pack, "pack.mcmeta"), "w").write('{"pack":{"pack_format":6,"de
 F = os.path.join(pack, "data/wiztest/functions")
 open(os.path.join(F, "fx.mcfunction"), "w").write("\n".join([
     "effect give @s minecraft:levitation 1000 255 true",
-    "tp @s ~ ~ ~ 0 0",
     "execute at @s run summon armor_stand ^-1 ^-0.5 ^3 {NoGravity:1b,Invisible:1b,Tags:[\"wiztest\"],ArmorItems:[{},{},{},{id:\"minecraft:iron_hoe\",Count:1b,tag:{Unbreakable:1b,Damage:164,HideFlags:63}}]}",
     "execute at @s run summon armor_stand ^1 ^-0.5 ^3 {NoGravity:1b,Tags:[\"wiztest\"],HandItems:[{id:\"minecraft:golden_shovel\",Count:1b,tag:{Unbreakable:1b,Damage:30}},{}],ArmorItems:[{},{},{},{id:\"minecraft:diamond_hoe\",Count:1b,tag:{Unbreakable:1b,Damage:1285}}]}",
     "execute at @s run summon armor_stand ^ ^-0.5 ^3 {NoGravity:1b,Tags:[\"wiztest\"],ArmorItems:[{},{},{},{id:\"minecraft:gold_block\",Count:1b}]}",
@@ -102,15 +101,19 @@ for i in range(3):
     shot(f"particles-{i}")
 key("F1")
 time.sleep(1)
+command("/advancement grant @s only hp:quests/root")
+time.sleep(1)
+shot("root-0")
+time.sleep(7)
 command("/advancement grant @s only hp:quests/apparition_new")
-time.sleep(0.8)
-shot("toast-0")
-time.sleep(1.2)
-shot("toast-1")
-command("/advancement grant @s only hp:quests/apparition_completed")
-time.sleep(1.5)
-shot("toast-2")
+for i, d in enumerate([0.3, 0.8, 1.5, 2.5]):
+    time.sleep(d)
+    shot(f"toast-{i}")
 time.sleep(6)
+command("/advancement grant @s until hp:ui/ui28_void")
+time.sleep(3)
+shot("tips")
+time.sleep(5)
 key("l")
 time.sleep(2)
 shot("advscreen")
