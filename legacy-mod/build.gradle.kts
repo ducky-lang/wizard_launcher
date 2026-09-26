@@ -12,7 +12,7 @@ val targets = mapOf(
 val mc = (findProperty("mc") as String?) ?: "1.20.1"
 val target = targets[mc] ?: error("Wizard Legacy Packs does not support Minecraft $mc (supported: ${targets.keys})")
 
-version = "1.0.0"
+version = "1.0.1"
 group = "dev.wizardlauncher"
 
 base { archivesName.set("wizard-legacy-packs") }

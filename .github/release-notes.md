@@ -1,6 +1,12 @@
-## Wizard Launcher 1.0.0
+## Wizard Launcher 1.0.1
 
 The one-click portal to *Witchcraft & Wizardry*: a hand-built 1.16.5 castle, played on a modern Minecraft 1.20.1 or 1.21.1 client, with the world running on your own computer.
+
+### Fixed in 1.0.1
+
+- **Spell particles and quest banners are back.** The FPS Modpack's defaults switched off every particle and toast, so wand effects and the "New Quest!" banners never appeared. The launcher now keeps them on, on both versions.
+- **The Home artwork shows again** now that the resource pack stays zipped; before the castle is installed, a painted castle scene is shown instead of a black background.
+- **New intro animation**: a golden sigil draws itself and the crest appears in a burst of light, instead of the spinning ring.
 
 ### Play
 
@@ -26,7 +32,7 @@ The one-click portal to *Witchcraft & Wizardry*: a hand-built 1.16.5 castle, pla
 
 | System | File |
 |---|---|
-| Windows 10/11 (64-bit) | `WizardLauncher-Windows-Setup-1.0.0.exe` |
+| Windows 10/11 (64-bit) | `WizardLauncher-Windows-Setup-1.0.1.exe` |
 | macOS (Apple silicon) | `WizardLauncher-macOS.dmg` |
 | Linux (x86_64) | `WizardLauncher-Linux-x86_64.AppImage` |
 

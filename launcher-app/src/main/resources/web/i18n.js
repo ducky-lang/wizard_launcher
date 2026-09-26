@@ -65,10 +65,10 @@ const I18N = {
     "toast.repaired": "All game files are in place", "toast.exported": "Saved to {path}", "toast.copied": "Copied", "toast.stopped": "The world has been saved",
     "toast.error": "Something went wrong", "toast.gameClosed": "Minecraft closed", "toast.update": "A new version is available",
     "time.never": "never", "time.now": "just now", "time.min": "{n} min ago", "time.hour": "{n} h ago", "time.day": "{n} d ago",
-    "news.1": "Play the castle on Minecraft 1.20.1 or 1.21.1: pick the version beside Play. Each keeps its own mods, settings and screenshots.",
+    "news.1": "Spell particles and quest banners are back: the modpack no longer switches off particles and toasts.",
     "news.2": "Import Fabric modpacks from Modrinth (.mrpack) as extra installations that join the same castle.",
     "news.3": "The castle's 1.16.5 resource pack, HUD, conversations and characters look and behave as the map was made, on both versions.",
     "news.4": "Lightweight FPS Modpack, parallel downloads and a single process for the world and the bridge keep things fast.",
-    "news.5": "Plays offline once installed; offline bundles move an install to another computer.",
+    "news.5": "New intro animation, and the Home page shows the castle artwork again, with a painted castle until it is installed.",
   }
 };
