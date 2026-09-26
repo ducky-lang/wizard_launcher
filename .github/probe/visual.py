@@ -4,7 +4,7 @@ MC = sys.argv[1]
 DATA = os.environ["WIZARD_LAUNCHER_DATA"]
 os.makedirs(DATA, exist_ok=True)
 json.dump({"game_width": 1280, "game_height": 720}, open(os.path.join(DATA, "settings.json"), "w"))
-env = dict(os.environ, DISPLAY=":99")
+env = dict(os.environ, DISPLAY=":99", WIZARD_TRACE_EFFECTS="1")
 subprocess.Popen(["Xvfb", ":99", "-screen", "0", "1280x720x24"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 time.sleep(2)
 BIN = "launcher-app/build/install/WizardLauncher/bin/WizardLauncher"
@@ -59,10 +59,12 @@ def key(k):
 key("f")
 time.sleep(4)
 shot("f1")
+QUICK = os.environ.get("VISUAL_QUICK") == "1"
 for step in range(16):
     time.sleep(6)
-    burst(f"s{step:02d}", 2 if step % 3 else 3)
-    if step in (5, 9, 13):
+    if not QUICK:
+        burst(f"s{step:02d}", 2 if step % 3 else 3)
+    if step in (5, 9, 13) and not QUICK:
         xdo("click", "4")
         time.sleep(1.5)
         shot(f"s{step:02d}-up")
@@ -85,6 +87,10 @@ chat = [l for l in t.splitlines() if "[CHAT]" in l]
 print(f"@@CHAT {len(chat)} lines")
 for l in chat[-120:]:
     print("CHAT", repr(l[-400:]))
+print("@@MOD")
+for l in t.splitlines():
+    if "WizardLegacyPacks" in l or "wizard_legacy_packs" in l or ("ixin" in l and ("ERROR" in l or "rror" in l)):
+        print("M", l[:500])
 print("@@WARN")
 seen = set()
 for l in t.splitlines():

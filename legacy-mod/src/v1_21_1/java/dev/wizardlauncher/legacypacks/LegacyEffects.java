@@ -7,11 +7,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class LegacyEffects {
     private static final ThreadLocal<Integer> PENDING = new ThreadLocal<>();
     private static final AtomicBoolean REPORTED = new AtomicBoolean();
+    private static final boolean TRACE = System.getenv("WIZARD_TRACE_EFFECTS") != null;
 
     private LegacyEffects() {
     }
 
     public static void expect(SocketAddress server, int amplifier) {
+        if (TRACE) {
+            LegacyPacks.LOGGER.info("Effect packet: amplifier {} from {}", amplifier, server);
+        }
         if (server instanceof InetSocketAddress inet && inet.getAddress() != null && inet.getAddress().isLoopbackAddress()) {
             PENDING.set(amplifier);
         } else {
@@ -26,6 +30,9 @@ public final class LegacyEffects {
     public static Integer take() {
         Integer amplifier = PENDING.get();
         PENDING.remove();
+        if (TRACE && amplifier != null) {
+            LegacyPacks.LOGGER.info("Effect amplifier {} applied to a new effect", amplifier);
+        }
         return amplifier;
     }
 

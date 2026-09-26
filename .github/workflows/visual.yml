@@ -25,5 +25,21 @@ jobs:
       - run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb xdotool imagemagick libgl1-mesa-dri libglx-mesa0 libegl1 > /dev/null
+      - if: matrix.mc == '1.21.1'
+        run: |
+          JAR=$(find ~/.gradle/caches legacy-mod/.gradle -name "minecraft-*merged*1.21.1*.jar" 2>/dev/null | grep -v sources | head -1)
+          [ -z "$JAR" ] && JAR=$(find ~/.gradle/caches legacy-mod/.gradle -name "*.jar" 2>/dev/null | grep -i "1.21.1" | grep -iv "sources\|intermediary" | head -1)
+          echo "JAR=$JAR"
+          for c in net.minecraft.world.effect.MobEffectInstance net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket; do
+            javap -p -classpath "$JAR" $c | head -60
+          done
+          javap -c -p -classpath "$JAR" net.minecraft.world.effect.MobEffectInstance | awk '/MobEffectInstance\(net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect>, int, int, boolean, boolean, boolean, net.minecraft.world.effect.MobEffectInstance\);/,/return/'
+          javap -c -p -classpath "$JAR" net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket | awk '/RegistryFriendlyByteBuf\);/,/return/'
+          javap -c -p -classpath "$JAR" net.minecraft.client.multiplayer.ClientPacketListener | awk '/void handleUpdateMobEffect/,/return/'
+          javap -c -p -classpath "$JAR" net.minecraft.world.entity.LivingEntity | grep -n "LEVITATION\|getAmplifier\|void travel" | head -20
+      - run: |
+          unzip -p legacy-mod/build/libs/wizard-legacy-packs-${{ matrix.mc }}.jar wizard_legacy_packs.mixins.json
+          unzip -l legacy-mod/build/libs/wizard-legacy-packs-${{ matrix.mc }}.jar | grep -i mixin
       - run: python3 .github/probe/visual.py ${{ matrix.mc }}
+        env: { VISUAL_QUICK: "1" }
         timeout-minutes: 30
