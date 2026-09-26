@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Wizard Launcher
+Comment=Launcher for the Witchcraft and Wizardry Minecraft map
+Exec=WizardLauncher
+Icon=wizardlauncher
+Categories=Game;
+Terminal=false

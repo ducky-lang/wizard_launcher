@@ -1,0 +1,16 @@
+.gradle/
+build/
+*/build/
+local.properties
+.kotlin/
+
+.idea/
+*.iml
+.vscode/
+
+installer/app.ico
+installer/app.icns
+installer/linux/app.png
+
+logs/
+*.wizardpack

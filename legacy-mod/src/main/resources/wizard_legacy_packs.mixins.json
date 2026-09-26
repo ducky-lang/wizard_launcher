@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.wizardlauncher.legacypacks.mixin",
+  "compatibilityLevel": "JAVA_${java}",
+  "client": [
+    "PackCompatibilityMixin",
+    "PackRepositoryMixin",
+    "QuickPlayAccessor",
+    "QuickPlayMixin"${versionMixins}
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

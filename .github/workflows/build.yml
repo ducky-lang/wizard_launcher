@@ -1,0 +1,206 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*.*.*"]
+  pull_request: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build --no-daemon
+
+  legacy-mod:
+    strategy:
+      fail-fast: false
+      matrix:
+        mc: ["1.20.1", "1.21.1"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew -p legacy-mod build -Pmc=${{ matrix.mc }} --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legacy-mod-${{ matrix.mc }}
+          path: legacy-mod/build/libs/wizard-legacy-packs-${{ matrix.mc }}.jar
+          if-no-files-found: error
+
+  e2e:
+    needs: [test, legacy-mod]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      WIZARD_LAUNCHER_DATA: ${{ github.workspace }}/e2e-data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: legacy-mod-*, path: legacy-mod/build/libs, merge-multiple: true }
+      - run: ./gradlew fetchGameJars :launcher-app:installDist --no-daemon
+      - name: Install and verify both game versions
+        shell: bash
+        run: |
+          BIN=launcher-app/build/install/WizardLauncher/bin/WizardLauncher
+          if [ "$RUNNER_OS" = "Windows" ]; then BIN="$BIN.bat"; fi
+          "$BIN" --list-instances
+          "$BIN" --verify-install --instance 1.20.1
+          "$BIN" --verify-install --instance 1.21.1
+      - name: Start Minecraft 1.20.1 and 1.21.1 with a 1.16.5 pack
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 libegl1 > /dev/null
+          python3 - <<'PY'
+          import io, json, struct, zlib, zipfile
+          def png(w, h, rgba):
+              raw = b"".join(b"\x00" + bytes(rgba) * w for _ in range(h))
+              def chunk(t, d): return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+              return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+          files = {
+              "pack.mcmeta": json.dumps({"pack": {"pack_format": 6, "description": "Legacy 1.16.5 test pack"}}),
+              "assets/minecraft/textures/block/grass_path_top.png": png(16, 16, (200, 40, 40, 255)),
+              "assets/minecraft/blockstates/cauldron.json": json.dumps({"variants": {f"level={i}": {"model": "minecraft:block/cauldron" if i == 0 else f"minecraft:block/cauldron_level{i}"} for i in range(4)}}),
+              "assets/wizard/textures/custom/wand.png": png(16, 16, (120, 60, 200, 255)),
+              "assets/minecraft/models/item/stick.json": json.dumps({"parent": "item/generated", "textures": {"layer0": "wizard:custom/wand"}}),
+              "assets/minecraft/textures/font/unicode_page_e0.png": png(256, 256, (255, 255, 255, 255)),
+              "assets/minecraft/font/default.json": json.dumps({"providers": [{"type": "legacy_unicode", "sizes": "minecraft:font/glyph_sizes.bin", "template": "minecraft:font/unicode_page_%s.png"}]}),
+              "assets/minecraft/models/block/iron_door_bottom.json": json.dumps({"parent": "block/door_bottom", "textures": {"bottom": "block/iron_door_bottom", "top": "block/iron_door_top"}}),
+              "assets/minecraft/models/block/vine_1.json": json.dumps({"parent": "block/block", "ambientocclusion": False, "textures": {"particle": "block/vine", "vine": "block/vine"}, "elements": [{"from": [0, 0, 15.2], "to": [16, 16, 15.2], "shade": False, "faces": {"north": {"uv": [16, 0, 0, 16], "texture": "#vine", "tintindex": 0}, "south": {"uv": [0, 0, 16, 16], "texture": "#vine", "tintindex": 0}}}]}),
+              "assets/minecraft/models/block/soul_fire_floor0.json": json.dumps({"parent": "block/fire_floor", "textures": {"particle": "block/soul_fire_0", "fire": "block/soul_fire_0"}}),
+              "assets/minecraft/sounds/block/wooden_door/open.ogg": b"OggS",
+              "assets/minecraft/textures/gui/widgets.png": png(256, 256, (90, 90, 160, 255)),
+              "assets/minecraft/textures/block/grass.png": png(16, 16, (60, 160, 60, 255)),
+          }
+          with zipfile.ZipFile("legacy-test-pack.zip", "w") as z:
+              for n, d in files.items():
+                  z.writestr(n, d if isinstance(d, bytes) else d.encode())
+          PY
+          for mc in 1.20.1 1.21.1; do
+            xvfb-run -a -s "-screen 0 1280x720x24" launcher-app/build/install/WizardLauncher/bin/WizardLauncher --smoke-client --instance "$mc" --pack legacy-test-pack.zip --timeout 420
+          done
+      - name: Collect logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ matrix.os }}
+          path: |
+            e2e-data/logs
+            e2e-data/resources/client/*/minecraft/logs
+          if-no-files-found: ignore
+
+  installers:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [e2e]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            type: app-image
+          - os: macos-latest
+            type: dmg
+          - os: ubuntu-latest
+            type: app-image
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/download-artifact@v4
+        with: { pattern: legacy-mod-*, path: legacy-mod/build/libs, merge-multiple: true }
+      - run: ./gradlew fetchGameJars :launcher-app:jpackage -PjpackageType=${{ matrix.type }} --no-daemon
+        env: { MC_LAUNCHER_CLIENT_ID: "${{ secrets.MC_LAUNCHER_CLIENT_ID }}" }
+      - name: Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $version = (Select-String -Path gradle.properties -Pattern '^launcherVersion=(.*)$').Matches[0].Groups[1].Value
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" installer\WizardLauncher.iss
+      - name: macOS disk image
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p build_installer
+          cp launcher-app/build/jpackage/*.dmg build_installer/WizardLauncher-macOS.dmg
+      - name: Linux AppImage
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libfuse2 > /dev/null
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          mkdir -p AppDir build_installer
+          cp -r launcher-app/build/jpackage/WizardLauncher/* AppDir/
+          cp installer/linux/wizardlauncher.desktop AppDir/
+          cp installer/linux/app.png AppDir/wizardlauncher.png
+          printf '#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/bin/WizardLauncher" "$@"\n' > AppDir/AppRun
+          chmod +x AppDir/AppRun
+          ARCH=x86_64 ./appimagetool AppDir build_installer/WizardLauncher-Linux-x86_64.AppImage
+      - name: Checksums
+        shell: bash
+        run: |
+          cd build_installer
+          for f in *.exe *.dmg *.AppImage; do
+            [ -f "$f" ] || continue
+            if command -v sha256sum > /dev/null; then sha256sum "$f"; else shasum -a 256 "$f"; fi
+          done > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ runner.os }}
+          path: build_installer/
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [installers]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=v$(grep '^launcherVersion=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          fi
+          echo "title=$(head -n 1 .github/release-notes.md | sed 's/^#* *//')" >> "$GITHUB_OUTPUT"
+      - name: Replace an existing release of the same version
+        if: github.event_name == 'workflow_dispatch'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh release delete "${{ steps.tag.outputs.name }}" --cleanup-tag --yes || true
+      - uses: actions/download-artifact@v4
+        with: { path: dist, pattern: installer-*, merge-multiple: true }
+      - name: Merge checksums
+        run: |
+          cd dist
+          sha256sum *.exe *.dmg *.AppImage > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.tag.outputs.title }}
+          body_path: .github/release-notes.md
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/SHA256SUMS.txt

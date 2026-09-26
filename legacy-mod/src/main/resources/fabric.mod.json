@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "wizard_legacy_packs",
+  "version": "${version}",
+  "name": "Wizard Legacy Packs",
+  "description": "Lets Minecraft ${minecraft} read resource packs made for older versions directly, and holds Wizard Launcher's one-click join until the world on this computer is ready.",
+  "authors": ["Foxy"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "preLaunch": ["dev.wizardlauncher.legacypacks.LegacyPacksPreLaunch"],
+    "client": ["dev.wizardlauncher.legacypacks.LegacyPacksClient"]
+  },
+  "mixins": ["wizard_legacy_packs.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "minecraft": "~${minecraft}",
+    "java": ">=${java}"
+  }
+}

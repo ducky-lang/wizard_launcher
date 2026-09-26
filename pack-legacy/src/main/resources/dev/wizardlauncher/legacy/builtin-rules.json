@@ -1,0 +1,172 @@
+{
+  "stages": [
+    {
+      "max_format": 6,
+      "copy_files": [
+        {
+          "from": "assets/minecraft/blockstates/grass_path.json",
+          "to": "assets/minecraft/blockstates/dirt_path.json"
+        },
+        {
+          "from": "assets/minecraft/models/block/grass_path.json",
+          "to": "assets/minecraft/models/block/dirt_path.json"
+        },
+        {
+          "from": "assets/minecraft/models/item/grass_path.json",
+          "to": "assets/minecraft/models/item/dirt_path.json"
+        },
+        {
+          "from": "assets/minecraft/textures/block/grass_path_side.png",
+          "to": "assets/minecraft/textures/block/dirt_path_side.png"
+        },
+        {
+          "from": "assets/minecraft/textures/block/grass_path_side.png.mcmeta",
+          "to": "assets/minecraft/textures/block/dirt_path_side.png.mcmeta"
+        },
+        {
+          "from": "assets/minecraft/textures/block/grass_path_top.png",
+          "to": "assets/minecraft/textures/block/dirt_path_top.png"
+        },
+        {
+          "from": "assets/minecraft/textures/block/grass_path_top.png.mcmeta",
+          "to": "assets/minecraft/textures/block/dirt_path_top.png.mcmeta"
+        },
+        {
+          "from": "assets/minecraft/textures/entity/squid.png",
+          "to": "assets/minecraft/textures/entity/squid/squid.png"
+        },
+        {
+          "from": "assets/minecraft/models/block/cauldron_level1.json",
+          "to": "assets/minecraft/models/block/water_cauldron_level1.json"
+        },
+        {
+          "from": "assets/minecraft/models/block/cauldron_level2.json",
+          "to": "assets/minecraft/models/block/water_cauldron_level2.json"
+        },
+        {
+          "from": "assets/minecraft/models/block/cauldron_level3.json",
+          "to": "assets/minecraft/models/block/water_cauldron_full.json"
+        }
+      ],
+      "rename_references": {
+        "models": {
+          "minecraft:block/grass_path": "minecraft:block/dirt_path",
+          "minecraft:item/grass_path": "minecraft:item/dirt_path",
+          "minecraft:block/cauldron_level1": "minecraft:block/water_cauldron_level1",
+          "minecraft:block/cauldron_level2": "minecraft:block/water_cauldron_level2",
+          "minecraft:block/cauldron_level3": "minecraft:block/water_cauldron_full"
+        },
+        "textures": {
+          "minecraft:block/grass_path_side": "minecraft:block/dirt_path_side",
+          "minecraft:block/grass_path_top": "minecraft:block/dirt_path_top"
+        }
+      },
+      "split_blockstates": [
+        {
+          "from": "minecraft:cauldron",
+          "when": {
+            "level": "0"
+          },
+          "to": "minecraft:cauldron",
+          "remove_properties": [
+            "level"
+          ]
+        },
+        {
+          "from": "minecraft:cauldron",
+          "when": {
+            "level": "1|2|3"
+          },
+          "to": "minecraft:water_cauldron"
+        }
+      ],
+      "lang_keys": {
+        "block.minecraft.grass_path": "block.minecraft.dirt_path"
+      }
+    },
+    {
+      "max_format": 12,
+      "copy_files": [
+        {
+          "from": "assets/minecraft/textures/misc/enchanted_item_glint.png",
+          "to": "assets/minecraft/textures/misc/enchanted_glint_entity.png"
+        },
+        {
+          "from": "assets/minecraft/textures/misc/enchanted_item_glint.png",
+          "to": "assets/minecraft/textures/misc/enchanted_glint_item.png"
+        },
+        {
+          "from": "assets/minecraft/textures/entity/steve.png",
+          "to": "assets/minecraft/textures/entity/player/wide/steve.png"
+        },
+        {
+          "from": "assets/minecraft/textures/entity/alex.png",
+          "to": "assets/minecraft/textures/entity/player/slim/alex.png"
+        }
+      ]
+    },
+    {
+      "max_format": 21,
+      "min_target": 22,
+      "copy_files": [
+        {
+          "from": "assets/minecraft/blockstates/grass.json",
+          "to": "assets/minecraft/blockstates/short_grass.json"
+        },
+        {
+          "from": "assets/minecraft/models/block/grass.json",
+          "to": "assets/minecraft/models/block/short_grass.json"
+        },
+        {
+          "from": "assets/minecraft/models/item/grass.json",
+          "to": "assets/minecraft/models/item/short_grass.json"
+        },
+        {
+          "from": "assets/minecraft/textures/block/grass.png",
+          "to": "assets/minecraft/textures/block/short_grass.png"
+        },
+        {
+          "from": "assets/minecraft/textures/block/grass.png.mcmeta",
+          "to": "assets/minecraft/textures/block/short_grass.png.mcmeta"
+        }
+      ],
+      "rename_references": {
+        "models": {
+          "minecraft:block/grass": "minecraft:block/short_grass",
+          "minecraft:item/grass": "minecraft:item/short_grass"
+        },
+        "textures": {
+          "minecraft:block/grass": "minecraft:block/short_grass"
+        }
+      },
+      "lang_keys": {
+        "block.minecraft.grass": "block.minecraft.short_grass"
+      }
+    },
+    {
+      "max_format": 31,
+      "min_target": 32,
+      "copy_files": [
+        {
+          "from": "assets/minecraft/models/item/scute.json",
+          "to": "assets/minecraft/models/item/turtle_scute.json"
+        },
+        {
+          "from": "assets/minecraft/textures/item/scute.png",
+          "to": "assets/minecraft/textures/item/turtle_scute.png"
+        }
+      ],
+      "rename_references": {
+        "models": {
+          "minecraft:item/scute": "minecraft:item/turtle_scute"
+        },
+        "textures": {
+          "minecraft:item/scute": "minecraft:item/turtle_scute"
+        }
+      },
+      "lang_keys": {
+        "item.minecraft.scute": "item.minecraft.turtle_scute"
+      }
+    }
+  ]
+}
