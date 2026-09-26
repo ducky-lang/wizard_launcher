@@ -3,10 +3,12 @@ package dev.wizardlauncher.legacypacks;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class LegacyEffects {
     private static final AtomicBoolean REPORTED = new AtomicBoolean();
     private static final boolean TRACE = System.getenv("WIZARD_TRACE_EFFECTS") != null;
+    private static final AtomicInteger TRACED = new AtomicInteger();
 
     private LegacyEffects() {
     }
@@ -20,7 +22,7 @@ public final class LegacyEffects {
     }
 
     public static void trace(String message) {
-        if (TRACE) {
+        if (TRACE && TRACED.incrementAndGet() <= 40) {
             LegacyPacks.LOGGER.info("[WizardLegacyPacks] effect: {}", message);
         }
     }
