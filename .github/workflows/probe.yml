@@ -1,0 +1,23 @@
+name: Probe
+on:
+  push:
+    branches: ["claude/cool-knuth-wl1au0"]
+    paths: [".github/workflows/probe.yml", ".github/probe/**"]
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/probe/hagrid.py
+  code:
+    strategy:
+      matrix:
+        mc: ["1.20.1", "1.21.1"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew -p legacy-mod build -Pmc=${{ matrix.mc }} --no-daemon -q
+      - run: bash .github/probe/riding.sh ${{ matrix.mc }}
