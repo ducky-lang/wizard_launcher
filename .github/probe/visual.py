@@ -88,8 +88,12 @@ print(f"@@CHAT {len(chat)} lines")
 for l in chat[-120:]:
     print("CHAT", repr(l[-400:]))
 print("@@MOD")
-for l in t.splitlines():
-    if "WizardLegacyPacks" in l or "wizard_legacy_packs" in l or ("ixin" in l and ("ERROR" in l or "rror" in l)):
+lines = t.splitlines()
+for i, l in enumerate(lines):
+    if "REFMAP" in l:
+        for c in lines[max(0, i - 4):i + 3]:
+            print("R", c[:400])
+    if "WizardLegacyPacks" in l or "wizard_legacy_packs" in l or ("ixin" in l and "wizard" in l.lower()):
         print("M", l[:500])
 print("@@WARN")
 seen = set()
