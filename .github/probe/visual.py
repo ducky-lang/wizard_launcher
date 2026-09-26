@@ -56,10 +56,11 @@ def burst(label, n=3, gap=0.35):
 def key(k):
     xdo("key", "--delay", "80", k)
 
-for _ in range(12):
+for step in range(16):
+    time.sleep(6)
     key("f")
-    time.sleep(3)
-shot("start")
+time.sleep(35)
+shot("room")
 
 def command(text):
     key("t")
@@ -99,6 +100,8 @@ for i in range(3):
     command("/function wiztest:particles")
     time.sleep(0.4)
     shot(f"particles-{i}")
+key("F1")
+time.sleep(1)
 command("/advancement grant @s only hp:quests/apparition_new")
 time.sleep(0.8)
 shot("toast-0")
@@ -113,7 +116,6 @@ time.sleep(2)
 shot("advscreen")
 key("Escape")
 time.sleep(1)
-key("F1")
 t = text()
 chat = [l for l in t.splitlines() if "[CHAT]" in l]
 print(f"@@CHAT {len(chat)} lines")
@@ -128,7 +130,7 @@ for i, l in enumerate(lines):
     if "REFMAP" in l:
         for c in lines[max(0, i - 4):i + 3]:
             print("R", c[:400])
-    if "WizardLegacyPacks" in l or "wizard_legacy_packs" in l or "dvancement" in l or "article" in l:
+    if "WizardLegacyPacks" in l or "wizard_legacy_packs" in l or "dvancement" in l or "article" in l or "oast" in l:
         print("M", l[:500])
         shown += 1
 print("@@WARN")
