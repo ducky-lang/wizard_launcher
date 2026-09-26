@@ -41,6 +41,8 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
     val accounts = AccountManager(paths.root.resolve("account.json"), secrets, settings)
     val instances = InstanceManager(paths, settings)
     private val playLock = ReentrantLock()
+    @Volatile private var contentJob: FutureTask<Unit>? = null
+    private val contentStatus = AtomicReference<Pair<Double?, String>>(null to "Downloading the castle...")
     @Volatile var server: ServerRunner? = null
         private set
 
@@ -99,15 +101,17 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
 
             stage(0)
             progress.update(0.02, "Preparing the castle...")
-            val latest = AtomicReference<Pair<Double?, String>>(null to "Downloading the castle...")
-            val quiet = Progress { fraction, message -> latest.set(fraction to message) }
-            val contentJob = FutureTask {
+            val content = contentJob?.takeIf { !it.isDone } ?: FutureTask {
+                val quiet = Progress { fraction, message -> contentStatus.set(fraction to message) }
                 val background = ContentInstaller(paths, state, downloader(catalog.download.content), quiet, online = !offline)
                 background.ensureWorld()
                 background.fetch(catalog.resource("resource_pack"))
                 Unit
+            }.also { job ->
+                contentStatus.set(null to "Downloading the castle...")
+                contentJob = job
+                Thread(job, "content-download").apply { isDaemon = true; start() }
             }
-            Thread(contentJob, "content-download").apply { isDaemon = true; start() }
 
             stage(1)
             if (!s.modpack.isInstalled()) s.modpack.fetchArchive()
@@ -119,13 +123,13 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
             ModConfigs.enforce(s.gameDir)
             val clientWaitsForWorld = s.content.ensureLegacyPackSupport(instance, s.gameDir)
             val legacyReader = Files.isRegularFile(s.gameDir.resolve("mods").resolve(ContentInstaller.LEGACY_MOD))
-            while (!contentJob.isDone) {
-                val (fraction, message) = latest.get()
+            while (!content.isDone) {
+                val (fraction, message) = contentStatus.get()
                 progress.update(fraction, message)
                 Thread.sleep(250)
             }
             try {
-                contentJob.get()
+                content.get()
             } catch (e: ExecutionException) {
                 throw e.cause as? Exception ?: e
             }
@@ -299,7 +303,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
     fun selfTestWorld(progress: Progress, playerName: String = "WizardTest"): String {
         if (supervisor.anyRunning()) throw LauncherException("Stop the game first.")
         val java = JavaLocator.find(settings, Catalog.current.minecraft.requiredJava)
-        ContentInstaller(paths, state, downloader(Catalog.current.download.content), progress).ensureWorld()
+        ContentInstaller(paths, state, downloader(Catalog.current.download.content), progress, online = !settings.offlineOnly).ensureWorld()
         val server = ServerRunner(paths, settings, state, supervisor, java, tool("wizard-server-host.jar"))
         this.server = server
         progress.update(null, "Starting the world...")
@@ -354,7 +358,7 @@ class Launcher(val paths: AppPaths = AppPaths.default().ensure()) {
     fun resetWorld(progress: Progress) {
         if (supervisor.anyRunning()) throw LauncherException("Stop the game first.")
         backupWorld()?.let { Log.info("World backed up to $it") }
-        ContentInstaller(paths, state, downloader(Catalog.current.download.content), progress).ensureWorld(force = true)
+        ContentInstaller(paths, state, downloader(Catalog.current.download.content), progress, online = !settings.offlineOnly).ensureWorld(force = true)
     }
 
     fun tool(name: String): Path {
